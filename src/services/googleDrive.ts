@@ -23,6 +23,11 @@ class GoogleDriveService {
 
   constructor() {
     this.clientId = import.meta.env.VITE_GOOGLEDRIVE || '';
+    
+    if (!this.clientId) {
+      console.warn('⚠️ VITE_GOOGLEDRIVE environment variable not found. Google Drive functionality will be disabled.');
+    }
+    
     this.loadStoredAuth();
   }
 
@@ -66,7 +71,7 @@ class GoogleDriveService {
   async authenticate(): Promise<boolean> {
     return new Promise((resolve, reject) => {
       if (!this.clientId) {
-        reject(new Error('Google Drive client ID not configured'));
+        reject(new Error('Google Drive client ID not configured. Please check your environment variables.'));
         return;
       }
 

@@ -350,6 +350,13 @@ function App() {
   const handleConnectGoogleDrive = async () => {
     try {
       setError(null);
+      
+      // Check if Google Drive is configured
+      if (!import.meta.env.VITE_GOOGLEDRIVE) {
+        setError("Google Drive is not configured. Please check the environment variables.");
+        return;
+      }
+      
       const success = await googleDriveService.authenticate();
       setIsGoogleDriveAuthenticated(success);
       if (!success) {
@@ -475,10 +482,19 @@ function App() {
           
           {!isGoogleDriveAuthenticated ? (
             <div className="google-drive-connect">
-              <p>Connect to Google Drive to access your books.</p>
-              <button onClick={handleConnectGoogleDrive} className="connect-button">
-                Connect to Google Drive
-              </button>
+              {!import.meta.env.VITE_GOOGLEDRIVE ? (
+                <div>
+                  <p>Google Drive is not configured.</p>
+                  <p>Please check your environment variables.</p>
+                </div>
+              ) : (
+                <div>
+                  <p>Connect to Google Drive to access your books.</p>
+                  <button onClick={handleConnectGoogleDrive} className="connect-button">
+                    Connect to Google Drive
+                  </button>
+                </div>
+              )}
             </div>
           ) : library.length > 0 ? (
             <>
