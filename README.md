@@ -1,16 +1,18 @@
-# E-Reader Web App
+# Fumikari E-Reader - Online Ebook Reader
 
-A modern e-reader web application built with React, TypeScript, and Vite. Supports both PDF and EPUB files with cloud storage integration via AWS S3.
+A modern e-reader web application built with React, TypeScript, and Vite. Specially designed for language learning with support for Migaku, Yomichan, and other browser extensions. Supports both PDF and EPUB files with cloud storage integration via AWS S3.
 
 ## ✨ Key Features
 
 - **Drag and drop support** for PDFs and EPUBs
-- **Cloud storage** with AWS S3 integration
+- **Cloud storage** with AWS S3 integration  
 - **Automatic cover art fetching** from the internet
 - **Accessibility features** and reading customization
 - **Reading progress tracking** with progress bars
-- **Migaku browser extension compatibility** for language learning
+- **Migaku & Yomichan browser extension compatibility** for language learning
 - **Iframe-free EPUB rendering** for better extension access
+- **Sliding settings panel** with book management features
+- **Hidden books functionality** for library organization
 
 ## 🔧 Migaku Extension Compatibility
 
@@ -94,6 +96,3 @@ This app is specifically designed to work with language learning browser extensi
 - Responsive design for mobile and desktop
 - Reading progress tracking and persistence
 - Focus on accessibility and modern React/TypeScript best practices
-  },
-})
-```
