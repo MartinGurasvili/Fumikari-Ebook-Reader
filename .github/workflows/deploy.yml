@@ -30,7 +30,9 @@ jobs:
       
     - name: Build
       run: npm run build
-      
+      env:
+        VITE_GOOGLEDRIVE: ${{ secrets.GOOGLEDRIVE }}
+        
     - name: Setup Pages
       uses: actions/configure-pages@v4
       
