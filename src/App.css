@@ -1,0 +1,1588 @@
+/* Enhanced typography and text readability */
+:root {
+  /* Light theme colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --border-color: #e0e0e0;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --shadow-hover: rgba(0, 0, 0, 0.15);
+  --accent: #0066cc;
+  --accent-hover: #0052a3;
+  --success: #28a745;
+  --warning: #ffc107;
+  --danger: #dc3545;
+}
+
+[data-theme="dark"] {
+  /* Dark theme colors */
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --text-primary: #ffffff;
+  --text-secondary: #b3b3b3;
+  --border-color: #404040;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --shadow-hover: rgba(0, 0, 0, 0.4);
+  --accent: #4dabf7;
+  --accent-hover: #339af0;
+  --success: #51cf66;
+  --warning: #ffd43b;
+  --danger: #ff6b6b;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Open Sans', 'Helvetica Neue', sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "liga" 1, "kern" 1;
+  text-size-adjust: 100%;
+  line-height: 1.6;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+#root {
+  margin: 0 auto;
+  text-align: center;
+  min-height: 100vh;
+  background-color: var(--bg-secondary);
+}
+
+.app {
+  background-color: var(--bg-secondary);
+  min-height: 100vh;
+  color: var(--text-primary);
+}
+
+/* Navigation Buttons */
+.nav-button {
+  pointer-events: auto;
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 0, 0, 1);
+  color: white;
+  border: none;
+  padding: 20px;
+  cursor: pointer;
+  font-size: 24px;
+  z-index: 999;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.nav-button:hover {
+  background: rgba(255, 0, 0, 0.5);
+}
+
+.nav-button:disabled {
+  opacity: 0.3;
+  cursor: default;
+  transform: translateY(-50%) scale(1);
+}
+
+.nav-button.prev {
+  left: 20px;
+}
+
+.nav-button.next {
+  right: 20px;
+  z-index: 999;
+}
+
+/* EPUB Reader Styles with Enhanced Readability */
+.epub-container {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: #fefefe;
+  margin: 0;
+  padding: 20px;
+  box-sizing: border-box;
+  /* Enhanced text rendering */
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "liga" 1, "kern" 1, "calt" 1;
+}
+
+.loading-overlay {
+  position: fixed;
+  top: 64px; /* Account for header */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-overlay::after {
+  content: '';
+  width: 24px;
+  height: 24px;
+  border: 2px solid #2196f3;
+  border-right-color: transparent;
+  border-radius: 50%;
+  margin-left: 8px;
+  animation: spin 1s linear infinite;
+}
+
+.loading-spinner {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--accent);
+  font-size: 1.2rem;
+  gap: 1rem;
+}
+
+.loading::after {
+  content: '';
+  width: 1.2rem;
+  height: 1.2rem;
+  border: 2px solid var(--accent);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: 2rem;
+  text-align: center;
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.error-message button {
+  margin-top: 12px;
+  background: #e11d48;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.error-message .retry-button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: #2196f3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.error-message .retry-button:hover {
+  background: #1976d2;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+.app {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Reader view container */
+.reader-view {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dropzone {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+/* File Drop Zone */
+.dropzone {
+  border: 2px dashed var(--border-color) !important;
+  border-radius: 12px !important;
+  padding: 2rem !important;
+  margin: 2rem 1rem !important;
+  text-align: center !important;
+  outline: none !important;
+  background: var(--bg-secondary) !important;
+  color: var(--text-secondary) !important;
+  transition: all 0.3s ease !important;
+  cursor: pointer !important;
+}
+
+.dropzone:hover {
+  border-color: var(--accent) !important;
+  background: var(--bg-primary) !important;
+}
+
+.dropzone.active {
+  border-color: var(--accent) !important;
+  background: var(--bg-primary) !important;
+  color: var(--accent) !important;
+  transform: scale(1.02);
+}
+
+.dropzone p {
+  margin: 0 !important;
+  font-size: 1rem !important;
+  line-height: 1.5 !important;
+}
+
+@media (max-width: 767px) {
+  .dropzone {
+    padding: 1.5rem !important;
+    margin: 1rem 0.5rem !important;
+  }
+  
+  .dropzone p {
+    font-size: 0.9rem !important;
+  }
+}
+
+.progress-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background-color: #f0f0f0;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #2196f3;
+  transition: width 0.3s ease;
+}
+
+.progress-label {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.epub-reader {
+  width: 100vw;
+  height: calc(100vh - 120px);
+  position: relative;
+  background: #fff;
+  overflow: hidden;
+}
+
+.viewer-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.viewer-container > div {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.navigation-controls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+}
+
+.navigation-controls button {
+  pointer-events: auto;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.navigation-controls button:hover {
+  opacity: 1;
+}
+
+.epub-viewer {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #fefefe;
+  /* Enhanced text rendering for reading */
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "liga" 1, "kern" 1, "calt" 1;
+}
+
+.epub-viewer iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  opacity: 1 !important;
+  transition: opacity 0.3s ease;
+  background: #fefefe !important;
+  /* Enhanced text rendering for better readability */
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  font-feature-settings: "liga" 1, "kern" 1, "calt" 1 !important;
+  /* Enable text selection for Migaku compatibility */
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+}
+
+/* Ensure content inside iframe is selectable and readable */
+.epub-viewer iframe * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  /* Enhanced text readability */
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  font-feature-settings: "liga" 1, "kern" 1, "calt" 1 !important;
+}
+
+/* Global text enhancement for EPUB content */
+.epub-viewer iframe body,
+.epub-viewer iframe p,
+.epub-viewer iframe div,
+.epub-viewer iframe span {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Charter', 'Georgia', 'Times New Roman', serif !important;
+  line-height: 1.7 !important;
+  color: #1a1a1a !important;
+  font-size: inherit !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  font-feature-settings: "liga" 1, "kern" 1, "calt" 1 !important;
+}
+
+/* Improve heading readability */
+.epub-viewer iframe h1,
+.epub-viewer iframe h2,
+.epub-viewer iframe h3,
+.epub-viewer iframe h4,
+.epub-viewer iframe h5,
+.epub-viewer iframe h6 {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif !important;
+  font-weight: 600 !important;
+  color: #0d1117 !important;
+  line-height: 1.4 !important;
+  margin-top: 1.5em !important;
+  margin-bottom: 0.75em !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+/* Enhanced paragraph spacing and readability */
+.epub-viewer iframe p {
+  margin-bottom: 1.2em !important;
+  text-align: justify !important;
+  hyphens: auto !important;
+  -webkit-hyphens: auto !important;
+  -moz-hyphens: auto !important;
+}
+
+/* Enhanced Migaku compatibility */
+.epub-viewer iframe[data-epub-viewer="true"] {
+  /* Mark iframe as an EPUB viewer for external tools */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+}
+
+.epub-viewer iframe.migaku-enabled-reader {
+  /* Enhanced styling for Migaku compatibility */
+  overflow: visible !important;
+  pointer-events: auto !important;
+}
+
+/* Migaku-specific iframe content styling */
+.epub-viewer iframe[data-migaku-compatible="true"] {
+  /* Ensure iframe content is fully accessible */
+  z-index: 1;
+  position: relative;
+}
+
+/* Better text selection highlighting for Migaku */
+.epub-viewer ::selection,
+.epub-viewer iframe ::selection {
+  background-color: rgba(33, 150, 243, 0.3);
+  color: inherit;
+}
+
+.epub-viewer ::-moz-selection,
+.epub-viewer iframe ::-moz-selection {
+  background-color: rgba(33, 150, 243, 0.3);
+  color: inherit;
+}
+
+.epub-viewer ::-moz-selection {
+  background-color: rgba(33, 150, 243, 0.3);
+  color: inherit;
+}
+
+/* Enhanced text selection highlighting for better accessibility */
+.epub-viewer ::selection,
+.epub-viewer iframe ::selection {
+  background-color: rgba(33, 150, 243, 0.3);
+  color: inherit;
+}
+
+.epub-viewer ::-moz-selection,
+.epub-viewer iframe ::-moz-selection {
+  background-color: rgba(33, 150, 243, 0.3);
+  color: inherit;
+}
+
+/* Improve focus indicators for accessibility */
+.nav-button:focus {
+  outline: 2px solid #2196f3;
+  outline-offset: 2px;
+}
+
+/* Hide navigation buttons when not hovering */
+.navigation-controls {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.epub-reader:hover .navigation-controls {
+  opacity: 1;
+}
+
+/* Migaku Extension Indicator */
+.migaku-indicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+  background: rgba(0, 128, 0, 0.9);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 12px;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.migaku-indicator:hover {
+  opacity: 1;
+}
+
+.migaku-indicator span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+}
+
+/* Migaku Text Mirror - Hidden but accessible to extensions */
+.migaku-text-mirror {
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  font-size: 16px !important;
+  line-height: 1.6 !important;
+  font-family: inherit !important;
+  /* Ensure text is selectable for Migaku */
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+}
+
+/* Ensure Migaku can access the mirror content */
+.migaku-text-mirror * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  font-family: inherit !important;
+  line-height: inherit !important;
+}
+
+/* Mark elements as parseable for Migaku */
+.migaku-text-mirror [data-migaku-parseable="true"] {
+  position: relative !important;
+  display: inline !important;
+}
+
+/* Library View Styles */
+.library-view {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  min-height: 100vh;
+  background-color: var(--bg-secondary);
+}
+
+.library-view h1 {
+  margin-bottom: 2rem;
+  color: var(--text-primary);
+}
+
+/* Library Header */
+.library-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0 1rem;
+}
+
+.library-header h1 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-button {
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  width: 3rem;
+  height: 3rem;
+  cursor: pointer;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.settings-button:hover {
+  background: var(--bg-secondary);
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px var(--shadow-hover);
+}
+
+/* Settings Panel */
+.settings-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 998;
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+.settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 400px;
+  max-width: 90vw;
+  height: 100vh;
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border-color);
+  box-shadow: -4px 0 24px var(--shadow);
+  z-index: 999;
+  transform: translateX(100%);
+  animation: slideInFromRight 0.3s ease-out forwards;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@keyframes slideInFromRight {
+  to {
+    transform: translateX(0);
+  }
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.settings-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.close-settings-button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+}
+
+.close-settings-button:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+
+.settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+.settings-section {
+  margin-bottom: 2rem;
+}
+
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.settings-section h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+.settings-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  padding: 0.5rem 0;
+  transition: color 0.2s ease;
+}
+
+.setting-item:hover {
+  color: var(--text-primary);
+}
+
+.setting-item input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.setting-item span {
+  flex: 1;
+  text-align: left;
+}
+
+.library-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.library-actions .fetch-covers-btn,
+.library-actions .debug-btn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.library-actions .fetch-covers-btn:hover,
+.library-actions .debug-btn:hover {
+  background: var(--border-color);
+  transform: translateY(-1px);
+}
+
+.library-actions .fetch-covers-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Theme Toggle */
+.theme-toggle {
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  width: 3rem;
+  height: 3rem;
+  cursor: pointer;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.theme-toggle:hover {
+  background: var(--bg-secondary);
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px var(--shadow-hover);
+}
+
+.book-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.progress-track {
+  flex: 1;
+  height: 6px;
+  background-color: var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  padding: 0 1rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.book-grid.compact {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+/* Mobile first responsive adjustments */
+@media (min-width: 480px) {
+  .book-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1.25rem;
+    padding: 0 1.5rem;
+  }
+  
+  .book-grid.compact {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .book-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+    padding: 0 2rem;
+  }
+  
+  .book-grid.compact {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .book-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 2rem;
+  }
+  
+  .book-grid.compact {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1.5rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .book-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 2.5rem;
+  }
+  
+  .book-grid.compact {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 2rem;
+  }
+}
+
+.book-card {
+  background: var(--bg-primary);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px var(--shadow);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+}
+
+.book-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px var(--shadow-hover);
+  border-color: var(--border-color);
+}
+
+.book-card:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.book-card.compact {
+  padding: 0;
+}
+
+.book-card.compact .book-cover {
+  aspect-ratio: 2/3;
+}
+
+.book-card.compact .book-info {
+  padding: 0.75rem;
+}
+
+.book-card.compact .book-title {
+  font-size: 0.85rem;
+  line-height: 1.3;
+  margin-bottom: 0.5rem;
+}
+
+.book-card.compact .book-progress-bar {
+  margin-top: 0.25rem;
+}
+
+.book-cover {
+  width: 100%;
+  aspect-ratio: 2/3;
+  background: var(--bg-secondary);
+  position: relative;
+  overflow: hidden;
+}
+
+.book-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.book-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--border-color) 100%);
+  border: 2px dashed var(--border-color);
+}
+
+.book-cover-placeholder span {
+  font-size: 3rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.book-info {
+  padding: 1rem;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 0; /* Allow flex shrinking */
+}
+
+.book-info h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  flex-grow: 1;
+}
+
+.book-progress {
+  margin-top: auto;
+  padding-top: 0.5rem;
+}
+
+.reader-header {
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--bg-primary);
+  box-shadow: 0 2px 4px var(--shadow);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.reader-header .back-button {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.reader-header .back-button:hover {
+  background: var(--border-color);
+}
+
+.reader-header .book-title {
+  flex: 1;
+}
+
+.reader-header .book-title h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Reader error styles */
+.reader-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  margin: 1rem;
+}
+
+.reader-error h3 {
+  color: var(--danger);
+  margin-bottom: 1rem;
+}
+
+.reader-error p {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  max-width: 500px;
+}
+
+/* DirectEpubReader Styles */
+.direct-epub-reader {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-primary);
+  position: relative;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "liga" 1, "kern" 1, "calt" 1;
+  overflow: hidden;
+}
+
+.direct-epub-reader.migaku-enabled {
+  font-feature-settings: "liga" 1, "kern" 1;
+}
+
+.epub-content-viewer {
+  flex: 1;
+  padding: 20px 40px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Charter', 'Georgia', serif;
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.epub-page {
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.epub-page h1,
+.epub-page h2,
+.epub-page h3,
+.epub-page h4,
+.epub-page h5,
+.epub-page h6 {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+.epub-page p {
+  margin-bottom: 1.2em;
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  -moz-hyphens: auto;
+}
+
+.reader-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1rem;
+  color: var(--text-primary);
+}
+
+.reader-loading .loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-color);
+  border-top: 4px solid var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.reader-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+  color: var(--danger);
+}
+
+.page-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-color);
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.page-nav-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.page-nav-button:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  border-color: var(--text-secondary);
+}
+
+.page-nav-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-nav-button .nav-icon {
+  font-size: 16px;
+}
+
+.page-nav-button .nav-text {
+  font-weight: 500;
+}
+
+.page-info {
+  flex: 1;
+  text-align: center;
+}
+
+.page-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.page-counter {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.chapter-title {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.settings-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.settings-button:hover {
+  background: var(--bg-secondary);
+  border-color: var(--text-secondary);
+}
+
+.settings-panel {
+  position: fixed;
+  top: 0%;
+  left: 70vw;
+  transform: translate( 50%);
+  background: var(--bg-primary);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px var(--shadow-hover);
+  z-index: 9999;
+  min-width: 300px;
+  max-width: 400px;
+}
+
+.settings-panel h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.setting-group label {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.setting-group input[type="range"] {
+  width: 100%;
+}
+
+.setting-group select {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.theme-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.theme-buttons button {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+}
+
+.theme-buttons button:hover {
+  background: var(--bg-secondary);
+}
+
+.theme-buttons button.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.migaku-status {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 128, 0, 0.9);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 12px;
+  z-index: 100;
+}
+
+/* Library Actions */
+.library-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 0 1rem;
+  flex-wrap: wrap;
+}
+
+.library-actions button {
+  padding: 0.75rem 1.5rem;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.library-actions button:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-2px);
+}
+
+.library-actions button:disabled {
+  background: var(--text-secondary);
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+}
+
+.fetch-covers-btn {
+  background: var(--success) !important;
+}
+
+.fetch-covers-btn:hover:not(:disabled) {
+  background: #218838 !important;
+}
+
+.debug-btn {
+  background: var(--warning) !important;
+  color: var(--text-primary) !important;
+}
+
+.debug-btn:hover:not(:disabled) {
+  background: #e0a800 !important;
+}
+
+/* Book Action Buttons */
+.book-card {
+  position: relative;
+}
+
+.book-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+}
+
+.book-action-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.8rem;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.2s ease;
+  z-index: 2;
+}
+
+.book-card:hover .book-action-button {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.book-action-button:hover {
+  background: rgba(0, 0, 0, 0.9);
+  transform: scale(1.1);
+}
+
+.book-action-button.hide-button {
+  background: rgba(220, 53, 69, 0.8);
+}
+
+.book-action-button.hide-button:hover {
+  background: rgba(220, 53, 69, 1);
+}
+
+.book-action-button.show-button {
+  background: rgba(40, 167, 69, 0.8);
+}
+
+.book-action-button.show-button:hover {
+  background: rgba(40, 167, 69, 1);
+}
+
+/* Hidden Books Section */
+.hidden-books-section {
+  margin-top: 2rem;
+  padding: 1rem 2rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.hidden-books-toggle {
+  width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  margin-bottom: 1rem;
+}
+
+.hidden-books-toggle:hover {
+  background: var(--border-color);
+}
+
+.hidden-books-toggle span:first-child {
+  font-weight: 500;
+}
+
+.toggle-icon {
+  font-size: 0.8rem;
+  transition: transform 0.2s ease;
+}
+
+.toggle-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.hidden-books {
+  margin-top: 1rem;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.book-card.hidden {
+  opacity: 0.7;
+  border: 1px dashed var(--border-color);
+}
+
+.book-card.hidden:hover {
+  opacity: 1;
+  border: 1px solid var(--border-color);
+}
+
+.book-card.hidden .book-info {
+  position: relative;
+}
+
+.book-card.hidden .book-info::before {
+  content: "Hidden";
+  position: absolute;
+  top: -0.5rem;
+  right: -0.5rem;
+  background: var(--text-secondary);
+  color: var(--bg-primary);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
