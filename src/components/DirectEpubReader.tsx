@@ -583,7 +583,7 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
   }, [currentPageIndex, doublePageView]);
 
   // Debounced progress saving to avoid too frequent updates
-  const saveProgressTimeoutRef = useRef<NodeJS.Timeout>();
+  const saveProgressTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   
   const saveProgress = useCallback((pageIndex: number, totalPages: number) => {
     if (!onProgressUpdate || totalPages === 0) return;

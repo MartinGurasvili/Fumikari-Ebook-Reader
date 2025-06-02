@@ -106,7 +106,7 @@ export const Reader: React.FC<ReaderProps> = ({
   const [currentProgress, setCurrentProgress] = useState(book.progress);
 
   // Debounced progress saving to avoid too frequent updates
-  const saveProgressTimeoutRef = useRef<NodeJS.Timeout>();
+  const saveProgressTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const lastSavedProgressRef = useRef<{ progress: number; cfi: string; page: number } | null>(null);
   
   const saveProgress = useCallback((cfi: string, progress: number, page: number) => {
@@ -562,6 +562,27 @@ export const Reader: React.FC<ReaderProps> = ({
       }
     };
   }, [book.id, book.currentCfi, getBookUrl, onBackToLibrary, saveProgress, saveProgressImmediately, goToNext, goToPrev]);
+
+  // Handle viewer clicks for navigation
+  const handleViewerClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    
+    // Don't navigate if clicking on interactive elements
+    if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.closest('a, button')) {
+      return;
+    }
+    
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const width = rect.width;
+    
+    // Click on left side goes to previous page, right side goes to next page
+    if (x < width * 0.3 && canGoPrev) {
+      goToPrev();
+    } else if (x > width * 0.7 && canGoNext) {
+      goToNext();
+    }
+  }, [canGoPrev, canGoNext, goToPrev, goToNext]);
 
   if (isLoading) {
     return (
