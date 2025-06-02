@@ -1,11 +1,10 @@
 # Fumikari E-Reader - Online Ebook Reader
 
-A modern e-reader web application built with React, TypeScript, and Vite. Specially designed for language learning with support for Migaku, Yomichan, and other browser extensions. Supports both PDF and EPUB files with cloud storage integration via AWS S3.
+A modern e-reader web application built with React, TypeScript, and Vite. Specially designed for language learning with support for Migaku, Yomichan, and other browser extensions. Supports both PDF and EPUB files.
 
 ## ✨ Key Features
 
 - **Drag and drop support** for PDFs and EPUBs
-- **Cloud storage** with AWS S3 integration  
 - **Automatic cover art fetching** from the internet
 - **Accessibility features** and reading customization
 - **Reading progress tracking** with progress bars
@@ -34,7 +33,6 @@ This e-reader specifically addresses the issue where browser extensions (like Mi
 ### Prerequisites
 - Node.js (v16 or higher)
 - npm or yarn
-- AWS S3 credentials (for cloud storage)
 
 ### Installation
 
@@ -43,8 +41,7 @@ This e-reader specifically addresses the issue where browser extensions (like Mi
    ```bash
    npm install
    ```
-3. Set up AWS S3 credentials in your environment
-4. Start the development server:
+3. Start the development server:
    ```bash
    npm run dev
    ```
@@ -58,8 +55,6 @@ src/
 │   ├── Reader.tsx              # Traditional iframe-based reader  
 │   ├── FileDrop.tsx           # File upload component
 │   └── ProgressBar.tsx        # Reading progress display
-├── services/
-│   └── s3.ts                  # AWS S3 integration
 └── App.tsx                    # Main application component
 ```
 
@@ -67,7 +62,7 @@ src/
 
 ### EPUB Rendering Approach
 The `DirectEpubReader` component:
-1. Downloads EPUB file from S3
+1. Downloads EPUB file
 2. Extracts and parses using JSZip
 3. Reads OPF manifest and spine for chapter order
 4. Renders HTML content directly in DOM elements
@@ -78,7 +73,6 @@ The `DirectEpubReader` component:
 - `epubjs`: Traditional EPUB rendering (used for fallback)
 - `jszip`: Direct EPUB file parsing and extraction
 - `pdfjs-dist`: PDF file rendering
-- `@aws-sdk/client-s3`: AWS S3 integration
 - `react-dropzone`: File upload functionality
 
 ## 🌐 Browser Extension Support

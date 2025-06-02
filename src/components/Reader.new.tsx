@@ -18,7 +18,7 @@ interface Book {
   id: string;
   fileName: string;
   coverUrl: string | null;
-  s3Key: string;
+  googleDriveId: string;
   progress: number;
   currentPage: number;
   currentCfi?: string;
@@ -29,7 +29,6 @@ interface ReaderProps {
   book: Book;
   getBookUrl: () => Promise<string>;
   onLocationChange: (cfi: string) => void;
-  onProgressUpdate: (progress: number) => void;
 }
 
 // Utility function to detect Migaku extension
@@ -93,7 +92,6 @@ export const Reader: React.FC<ReaderProps> = ({
   book,
   getBookUrl,
   onLocationChange,
-  onProgressUpdate,
 }) => {
   const viewerRef = useRef<HTMLDivElement>(null);
   const renditionRef = useRef<any>(null);

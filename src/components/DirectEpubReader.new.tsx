@@ -15,7 +15,7 @@ interface Book {
   id: string;
   fileName: string;
   coverUrl: string | null;
-  s3Key: string;
+  googleDriveId: string;
   progress: number;
   currentPage: number;
   currentCfi?: string;
@@ -25,8 +25,7 @@ interface Book {
 interface ReaderProps {
   book: Book;
   getBookUrl: () => Promise<string>;
-  onLocationChange: (cfi: string) => void;
-  onProgressUpdate: (progress: number) => void;
+  doublePageView?: boolean; // NEW PROP
 }
 
 interface EpubChapter {
@@ -71,54 +70,10 @@ const detectMigakuExtension = (): boolean => {
   }
 };
 
-// Simple language detection based on common words and patterns
-const detectLanguageFromContent = (text: string): string => {
-  const sample = text.substring(0, 1000).toLowerCase();
-  
-  // Japanese detection (hiragana, katakana, kanji)
-  if (/[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/.test(sample)) {
-    return 'ja';
-  }
-  
-  // Chinese detection (simplified/traditional Chinese characters)
-  if (/[\u4e00-\u9fff]/.test(sample)) {
-    return 'zh';
-  }
-  
-  // Korean detection (Hangul)
-  if (/[\uac00-\ud7af]/.test(sample)) {
-    return 'ko';
-  }
-  
-  // Spanish detection
-  if (/\b(el|la|de|que|y|a|en|un|es|se|no|te|lo|le|da|su|por|son|con|para|una|sobre|todo|pero|más|me|hasta|donde|quien|desde|porque|cuando)\b/.test(sample)) {
-    return 'es';
-  }
-  
-  // French detection
-  if (/\b(le|de|et|à|un|il|être|et|en|avoir|que|pour|dans|ce|son|une|sur|avec|ne|se|pas|tout|pouvoir|vous|par|grand|dans)\b/.test(sample)) {
-    return 'fr';
-  }
-  
-  // German detection
-  if (/\b(der|die|und|in|den|von|zu|das|mit|sich|des|auf|für|ist|im|dem|nicht|ein|eine|als|auch|es|an|werden|aus|er|hat|dass|sie|nach|wird|bei|einer|um|am|sind|noch|wie|einem|über|einen|so|zum|war|haben|nur|oder|aber|vor|zur|bis|unter|während|des)\b/.test(sample)) {
-    return 'de';
-  }
-  
-  // Russian detection
-  if (/[а-яё]/i.test(sample)) {
-    return 'ru';
-  }
-  
-  // Default to English
-  return 'en';
-};
-
 const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
   book,
   getBookUrl,
-  onLocationChange,
-  onProgressUpdate,
+  doublePageView = false // NEW PROP
 }) => {
   const viewerRef = useRef<HTMLDivElement>(null);
   const initializationRef = useRef<string | null>(null);
@@ -127,7 +82,6 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [pages, setPages] = useState<EpubPage[]>([]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [metadata, setMetadata] = useState<EpubMetadata | null>(null);
   const [migakuDetected, setMigakuDetected] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [textSettings, setTextSettings] = useState<TextSettings>({
@@ -137,6 +91,9 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
     margin: 40,
     theme: 'light'
   });
+
+  // Add local state for doublePageView toggle
+  const [localDoublePageView, setLocalDoublePageView] = useState(doublePageView);
 
   // Set mounted ref on mount and cleanup on unmount
   useEffect(() => {
@@ -164,9 +121,9 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
     document.body.appendChild(tempContainer);
     
     try {
-      const pageHeight = window.innerHeight - 200; // Account for navigation
-      
-      chapters.forEach((chapter, chapterIndex) => {
+      // Make page splitting more aggressive so pages fit the viewport and don't require scrolling
+      const pageHeight = Math.floor((window.innerHeight - 240) * 0.92); // 8% smaller than before
+      chapters.forEach((chapter) => {
         // Parse chapter content
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = chapter.content;
@@ -182,19 +139,14 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
         
         elements.forEach((element) => {
           const elementHtml = element.outerHTML || element.textContent || '';
-          
-          // Test if adding this element would exceed page height
           tempContainer.innerHTML = currentPageContent + elementHtml;
-          
           if (tempContainer.scrollHeight > pageHeight && currentPageContent.trim() !== '') {
-            // Current page is full, save it and start a new page
             pages.push({
               id: `page-${pages.length + 1}`,
               content: currentPageContent,
               chapterTitle: chapter.title,
               pageNumber: pageNumber
             });
-            
             currentPageContent = elementHtml;
             pageNumber++;
           } else {
@@ -218,6 +170,8 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
     
     return pages;
   }, []);
+
+  // Parse EPUB file
   const parseEpub = useCallback(async (url: string) => {
     try {
       console.log('🔍 Starting EPUB parsing for:', book.fileName);
@@ -448,7 +402,7 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
           )
         ]);
         
-        const { chapters: parsedChapters, metadata: parsedMetadata } = await parseWithTimeout as any;
+        const { chapters: parsedChapters } = await parseWithTimeout as any;
 
         if (!mountedRef.current) {
           console.log('⚠️ Component unmounted during parsing, aborting...');
@@ -459,15 +413,17 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
           throw new Error('No readable chapters found in EPUB file');
         }
 
-        console.log('📚 Setting parsed chapters and metadata...');
-        setChapters(parsedChapters);
-        setMetadata(parsedMetadata);
+        console.log('📚 Splitting content into pages...');
+        const epubPages = splitIntoPages(parsedChapters, textSettings);
+        console.log('📄 Created', epubPages.length, 'pages');
+
+        setPages(epubPages);
         
-        // Start from the first chapter or saved position
-        setCurrentChapterIndex(0);
+        // Start from the first page or saved position
+        setCurrentPageIndex(0);
         
         setIsLoading(false);
-        console.log('🎉 Direct EPUB reader initialized successfully with', parsedChapters.length, 'chapters');
+        console.log('🎉 Direct EPUB reader initialized successfully with', epubPages.length, 'pages');
 
       } catch (err) {
         if (!mountedRef.current) {
@@ -486,117 +442,79 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
 
     initReader();
 
-  }, [book.id]); // Only depend on book.id to prevent infinite loops
+  }, [book.id, splitIntoPages, parseEpub, getBookUrl, textSettings]);
 
-  // Render current chapter
+  // Re-split into pages when text settings change
   useEffect(() => {
-    if (!viewerRef.current || chapters.length === 0 || isLoading) return;
+    if (pages.length > 0) {
+      console.log('🔄 Text settings changed, re-splitting into pages...');
+      // We need to reconstruct chapters from pages to re-split
+      // For now, let's just trigger a re-initialization
+      initializationRef.current = null;
+    }
+  }, [textSettings, pages.length]);
 
-    const currentChapter = chapters[currentChapterIndex];
-    if (!currentChapter) return;
+  // Render current page
+  useEffect(() => {
+    if (!viewerRef.current || pages.length === 0 || isLoading) return;
 
-    // Clear previous content
     viewerRef.current.innerHTML = '';
 
-    // Create chapter container
-    const chapterContainer = document.createElement('div');
-    chapterContainer.className = 'epub-chapter';
-    chapterContainer.setAttribute('data-chapter-id', currentChapter.id);
-    chapterContainer.setAttribute('data-chapter-index', currentChapterIndex.toString());
-    
-    // Set language for Migaku
-    if (metadata?.language) {
-      chapterContainer.setAttribute('lang', metadata.language);
-    } else {
-      // Detect language from content
-      const detectedLang = detectLanguageFromContent(currentChapter.content);
-      chapterContainer.setAttribute('lang', detectedLang);
-    }
+    if (localDoublePageView) {
+      // Render two pages side by side
+      const leftPage = pages[currentPageIndex];
+      const rightPage = pages[currentPageIndex + 1];
+      const container = document.createElement('div');
+      container.className = 'epub-content-viewer double-page';
+      container.style.display = 'flex';
+      container.style.justifyContent = 'center';
+      container.style.alignItems = 'stretch';
+      container.style.width = '100%';
+      container.style.height = '100%';
+      container.style.overflow = 'hidden'; // Only allow scroll if overflow
 
-    // Add Migaku-specific attributes
-    if (migakuDetected) {
-      chapterContainer.setAttribute('data-migaku-parseable', 'true');
-      chapterContainer.setAttribute('data-epub-content', 'true');
-      chapterContainer.setAttribute('data-epub-chapter', currentChapterIndex.toString());
-      chapterContainer.classList.add('migaku-enabled-content');
-    }
-
-    // Set chapter content
-    chapterContainer.innerHTML = currentChapter.content;
-
-    // Add Migaku attributes to all text elements
-    if (migakuDetected) {
-      const textElements = chapterContainer.querySelectorAll('p, div, span, h1, h2, h3, h4, h5, h6, td, th, li, blockquote, pre');
-      textElements.forEach(element => {
-        element.setAttribute('data-migaku-parseable', 'true');
-        element.setAttribute('data-epub-text', 'true');
+      [leftPage, rightPage].forEach((page, idx) => {
+        if (!page) return;
+        const pageContainer = document.createElement('div');
+        pageContainer.className = 'epub-page';
+        pageContainer.setAttribute('data-page-id', page.id);
+        pageContainer.setAttribute('data-page-index', (currentPageIndex + idx).toString());
+        pageContainer.innerHTML = page.content;
+        pageContainer.style.flex = '1 1 0';
+        pageContainer.style.overflow = 'auto'; // Allow scroll fallback if Migaku/overflow
+        pageContainer.style.maxWidth = '50%';
+        pageContainer.style.boxSizing = 'border-box';
+        container.appendChild(pageContainer);
       });
+      viewerRef.current.appendChild(container);
+    } else {
+      // Single page view (default)
+      const currentPage = pages[currentPageIndex];
+      if (!currentPage) return;
+      const pageContainer = document.createElement('div');
+      pageContainer.className = 'epub-page';
+      pageContainer.setAttribute('data-page-id', currentPage.id);
+      pageContainer.setAttribute('data-page-index', currentPageIndex.toString());
+      pageContainer.innerHTML = currentPage.content;
+      pageContainer.style.overflow = 'auto';
+      viewerRef.current.appendChild(pageContainer);
     }
-
-    // Append to viewer
-    viewerRef.current.appendChild(chapterContainer);
-
-    // Trigger Migaku events
-    if (migakuDetected) {
-      setTimeout(() => {
-        // Dispatch content ready events for Migaku
-        const events = [
-          new Event('DOMContentLoaded', { bubbles: true }),
-          new CustomEvent('migaku-content-ready', {
-            detail: {
-              source: 'direct-epub-reader',
-              chapterIndex: currentChapterIndex,
-              chapterTitle: currentChapter.title,
-              language: chapterContainer.getAttribute('lang')
-            },
-            bubbles: true
-          })
-        ];
-
-        events.forEach(event => {
-          chapterContainer.dispatchEvent(event);
-          document.dispatchEvent(event);
-        });
-
-        console.log(`Chapter ${currentChapterIndex + 1} rendered for Migaku: ${currentChapter.title}`);
-      }, 100);
-    }
-
-    // Update progress
-    const progress = chapters.length > 0 ? (currentChapterIndex + 1) / chapters.length : 0;
-    onProgressUpdate(progress);
-
-    // Update location (using chapter index as CFI equivalent)
-    onLocationChange(`chapter-${currentChapterIndex}`);
-
-  }, [currentChapterIndex, chapters, metadata, migakuDetected, isLoading, onProgressUpdate, onLocationChange]);
+  }, [currentPageIndex, pages, isLoading, localDoublePageView]);
 
   // Navigation functions
   const goToNext = useCallback(() => {
-    if (currentChapterIndex < chapters.length - 1) {
-      setCurrentChapterIndex(prev => prev + 1);
+    if (currentPageIndex < pages.length - 1) {
+      setCurrentPageIndex(prev => prev + 1);
     }
-  }, [currentChapterIndex, chapters.length]);
+  }, [currentPageIndex, pages.length]);
 
   const goToPrev = useCallback(() => {
-    if (currentChapterIndex > 0) {
-      setCurrentChapterIndex(prev => prev - 1);
+    if (currentPageIndex > 0) {
+      setCurrentPageIndex(prev => prev - 1);
     }
-  }, [currentChapterIndex]);
+  }, [currentPageIndex]);
 
-  const handleViewerClick = useCallback((event: React.MouseEvent) => {
-    const rect = viewerRef.current!.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const isLeftSide = x < rect.width / 2;
-    
-    if (isLeftSide && currentChapterIndex > 0) {
-      goToPrev();
-    } else if (!isLeftSide && currentChapterIndex < chapters.length - 1) {
-      goToNext();
-    }
-  }, [currentChapterIndex, chapters.length, goToNext, goToPrev]);
-
-  // Keyboard navigation
+  // Keyboard navigation (removed click navigation)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
@@ -606,13 +524,13 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
         event.preventDefault();
         goToNext();
       } else if (event.key === 'Escape') {
-        setShowChapterList(false);
+        setShowSettings(false);
       }
     };
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (showChapterList && !(event.target as Element).closest('.chapter-info')) {
-        setShowChapterList(false);
+      if (showSettings && !(event.target as Element).closest('.settings-panel')) {
+        setShowSettings(false);
       }
     };
 
@@ -623,7 +541,7 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('click', handleClickOutside);
     };
-  }, [goToNext, goToPrev, showChapterList]);
+  }, [goToNext, goToPrev, showSettings]);
 
   if (error) {
     return (
@@ -637,25 +555,6 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
             setIsLoading(true);
             // Reset initialization ref to allow retry
             initializationRef.current = null;
-            // Retry initialization
-            setTimeout(() => {
-              const retryInit = async () => {
-                try {
-                  initializationRef.current = book.id;
-                  const url = await getBookUrl();
-                  const { chapters: parsedChapters, metadata: parsedMetadata } = await parseEpub(url);
-                  setChapters(parsedChapters);
-                  setMetadata(parsedMetadata);
-                  setCurrentChapterIndex(0);
-                  setIsLoading(false);
-                } catch (retryErr) {
-                  setError(retryErr instanceof Error ? retryErr.message : 'Failed to load book');
-                  setIsLoading(false);
-                  initializationRef.current = null;
-                }
-              };
-              retryInit();
-            }, 100);
           }}
           style={{
             marginTop: '1rem',
@@ -675,7 +574,7 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
 
   return (
     <div 
-      className={`direct-epub-reader ${migakuDetected ? 'migaku-enabled' : ''}`}
+      className={`direct-epub-reader ${migakuDetected ? 'migaku-enabled' : ''} theme-${textSettings.theme}`}
       data-migaku-reader={migakuDetected}
       data-epub-reader="direct"
     >
@@ -683,81 +582,45 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
         <div className="reader-loading">
           <div className="loading-spinner"></div>
           <p>Loading book... (ID: {book.id})</p>
-          <p>Status: {initializationRef.current === book.id ? 'Initializing' : 'Waiting'}</p>
+          <p>Status: {initializationRef.current === book.id ? 'Parsing and splitting into pages' : 'Waiting'}</p>
         </div>
       )}
       
       <div 
         ref={viewerRef}
         className="epub-content-viewer"
-        onClick={handleViewerClick}
         data-migaku-content-area={migakuDetected}
         style={{
           width: '100%',
-          height: '100%',
-          overflow: 'auto',
-          padding: '2rem',
-          backgroundColor: '#ffffff',
-          color: '#333333',
-          lineHeight: '1.6',
-          fontSize: '18px',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          cursor: 'pointer',
+          height: 'calc(100vh - 120px)',
+          overflow: 'hidden', // No scrolling
+          position: 'relative',
           userSelect: 'text'
         }}
       />
       
-      {/* Chapter navigation */}
-      <div className="chapter-navigation">
+      {/* Page navigation */}
+      <div className="page-navigation">
         <button 
           onClick={goToPrev} 
-          disabled={currentChapterIndex === 0}
-          className="chapter-nav-button prev-button"
-          aria-label="Previous chapter"
-          title={currentChapterIndex > 0 ? `Go to: ${chapters[currentChapterIndex - 1]?.title || 'Previous chapter'}` : 'No previous chapter'}
+          disabled={currentPageIndex === 0}
+          className="page-nav-button prev-button"
+          aria-label="Previous page"
+          title="Previous page"
         >
           <span className="nav-icon">←</span>
           <span className="nav-text">Previous</span>
         </button>
         
-        <div className="chapter-info">
-          {chapters.length > 0 && (
-            <div className="chapter-details">
-              <button 
-                className="chapter-dropdown-toggle"
-                onClick={() => setShowChapterList(!showChapterList)}
-                title="Select chapter"
-                aria-label="Chapter selection menu"
-              >
-                <div className="chapter-counter">
-                  {currentChapterIndex + 1} / {chapters.length}
-                </div>
-                {chapters[currentChapterIndex] && (
-                  <div className="chapter-title" title={chapters[currentChapterIndex].title}>
-                    {chapters[currentChapterIndex].title}
-                  </div>
-                )}
-                <span className="dropdown-arrow">{showChapterList ? '▲' : '▼'}</span>
-              </button>
-              
-              {showChapterList && (
-                <div className="chapter-dropdown">
-                  <div className="chapter-list">
-                    {chapters.map((chapter, index) => (
-                      <button
-                        key={chapter.id}
-                        className={`chapter-item ${index === currentChapterIndex ? 'current' : ''}`}
-                        onClick={() => {
-                          setCurrentChapterIndex(index);
-                          setShowChapterList(false);
-                        }}
-                        title={chapter.title}
-                      >
-                        <span className="chapter-number">{index + 1}</span>
-                        <span className="chapter-name">{chapter.title}</span>
-                      </button>
-                    ))}
-                  </div>
+        <div className="page-info">
+          {pages.length > 0 && (
+            <div className="page-details">
+              <div className="page-counter">
+                Page {currentPageIndex + 1} of {pages.length}
+              </div>
+              {pages[currentPageIndex] && (
+                <div className="chapter-title" title={pages[currentPageIndex].chapterTitle}>
+                  {pages[currentPageIndex].chapterTitle}
                 </div>
               )}
             </div>
@@ -765,16 +628,124 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
         </div>
         
         <button 
+          onClick={() => setShowSettings(!showSettings)}
+          className="settings-button"
+          aria-label="Reading settings"
+          title="Customize reading experience"
+        >
+          <span className="nav-icon">⚙️</span>
+          <span className="nav-text">Settings</span>
+        </button>
+        
+        <button 
           onClick={goToNext} 
-          disabled={currentChapterIndex >= chapters.length - 1}
-          className="chapter-nav-button next-button"
-          aria-label="Next chapter"
-          title={currentChapterIndex < chapters.length - 1 ? `Go to: ${chapters[currentChapterIndex + 1]?.title || 'Next chapter'}` : 'No next chapter'}
+          disabled={currentPageIndex >= pages.length - 1}
+          className="page-nav-button next-button"
+          aria-label="Next page"
+          title="Next page"
         >
           <span className="nav-text">Next</span>
           <span className="nav-icon">→</span>
         </button>
       </div>
+
+      {/* Settings panel */}
+      {showSettings && (
+        <div className="settings-panel">
+          <h3>Reading Settings</h3>
+          
+          <div className="setting-group">
+            <label>Font Size</label>
+            <input 
+              type="range" 
+              min="12" 
+              max="32" 
+              value={textSettings.fontSize}
+              onChange={(e) => setTextSettings(prev => ({ ...prev, fontSize: parseInt(e.target.value) }))}
+            />
+            <span>{textSettings.fontSize}px</span>
+          </div>
+          
+          <div className="setting-group">
+            <label>Line Height</label>
+            <input 
+              type="range" 
+              min="1.2" 
+              max="2.5" 
+              step="0.1"
+              value={textSettings.lineHeight}
+              onChange={(e) => setTextSettings(prev => ({ ...prev, lineHeight: parseFloat(e.target.value) }))}
+            />
+            <span>{textSettings.lineHeight}</span>
+          </div>
+          
+          <div className="setting-group">
+            <label>Margin</label>
+            <input 
+              type="range" 
+              min="20" 
+              max="80" 
+              value={textSettings.margin}
+              onChange={(e) => setTextSettings(prev => ({ ...prev, margin: parseInt(e.target.value) }))}
+            />
+            <span>{textSettings.margin}px</span>
+          </div>
+          
+          <div className="setting-group">
+            <label>Font Family</label>
+            <select 
+              value={textSettings.fontFamily}
+              onChange={(e) => setTextSettings(prev => ({ ...prev, fontFamily: e.target.value }))}
+            >
+              <option value="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">System Default</option>
+              <option value="Georgia, serif">Georgia</option>
+              <option value="'Times New Roman', serif">Times New Roman</option>
+              <option value="Arial, sans-serif">Arial</option>
+              <option value="'Courier New', monospace">Courier New</option>
+            </select>
+          </div>
+          
+          <div className="setting-group">
+            <label>Theme</label>
+            <div className="theme-buttons">
+              <button 
+                className={textSettings.theme === 'light' ? 'active' : ''}
+                onClick={() => setTextSettings(prev => ({ ...prev, theme: 'light' }))}
+              >
+                Light
+              </button>
+              <button 
+                className={textSettings.theme === 'dark' ? 'active' : ''}
+                onClick={() => setTextSettings(prev => ({ ...prev, theme: 'dark' }))}
+              >
+                Dark
+              </button>
+              <button 
+                className={textSettings.theme === 'sepia' ? 'active' : ''}
+                onClick={() => setTextSettings(prev => ({ ...prev, theme: 'sepia' }))}
+              >
+                Sepia
+              </button>
+            </div>
+          </div>
+
+          <div className="setting-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={localDoublePageView}
+                onChange={e => {
+                  setLocalDoublePageView(e.target.checked);
+                  if (typeof window !== 'undefined' && window.dispatchEvent) {
+                    window.dispatchEvent(new CustomEvent('doublePageViewChange', { detail: e.target.checked }));
+                  }
+                }}
+              />
+              Double Page View
+            </label>
+          </div>
+        </div>
+      )}
       
       {migakuDetected && (
         <div className="migaku-status">

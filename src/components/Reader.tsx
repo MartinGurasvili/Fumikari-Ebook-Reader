@@ -18,7 +18,7 @@ interface Book {
   id: string;
   fileName: string;
   coverUrl: string | null;
-  s3Key: string;
+  googleDriveId: string;
   progress: number;
   currentPage: number;
   currentCfi?: string;
@@ -28,8 +28,8 @@ interface Book {
 interface ReaderProps {
   book: Book;
   getBookUrl: () => Promise<string>;
-  onLocationChange: (cfi: string) => void;
-  onProgressUpdate: (progress: number) => void;
+  onBackToLibrary?: () => void;
+  onProgressUpdate?: (bookId: string, progress: number, currentCfi: string, currentPage: number) => void;
 }
 
 // Utility function to detect Migaku extension
@@ -50,28 +50,28 @@ const detectMigakuExtension = (): boolean => {
 const detectLanguageFromContent = (text: string): string => {
   const sample = text.substring(0, 1000).toLowerCase();
   
-  // Japanese detection (hiragana, katakana, kanji)
-  if (/[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/.test(sample)) {
+  // Japanese detection
+  if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(sample)) {
     return 'ja';
   }
   
-  // Chinese detection (simplified/traditional Chinese characters)
-  if (/[\u4e00-\u9fff]/.test(sample)) {
+  // Chinese detection
+  if (/[\u4E00-\u9FFF]/.test(sample)) {
     return 'zh';
   }
   
-  // Korean detection (Hangul)
-  if (/[\uac00-\ud7af]/.test(sample)) {
+  // Korean detection
+  if (/[\uAC00-\uD7AF]/.test(sample)) {
     return 'ko';
   }
   
   // Spanish detection
-  if (/\b(el|la|de|que|y|a|en|un|es|se|no|te|lo|le|da|su|por|son|con|para|una|sobre|todo|pero|más|me|hasta|donde|quien|desde|porque|cuando)\\b/.test(sample)) {
+  if (/\b(el|la|los|las|un|una|de|en|que|y|es|se|no|te|lo|le|da|su|por|son|con|para|al|una|su|del|las|la|una|es|en|él|ese|era|hasta|sin|sobre|ser|tiene|durante|antes|lugar|ella|caso|tiempo|persona|año|día|mundo|vida|hombre|estado|parte|niño|contra|esto|algo|alguien|yo|muy|puede|decir|cada|gran|aquí|donde|bien|poco|todo|mismo|otro|mucho|tanto|menos|mejor|mayor|mientras|cualquier|sea|bajo|manera|desde|cuando|hacer|cada|poder|gobierno|país|grupo|trabajo|mano|número|parte|sistema|caso|ser|haber|hacer|tener|decir|ir|saber|ver|dar|quedar|estar|poder|poner|pasar|llamar|llegar|deber|parecer|creer|seguir|llevar|dejar|sentir|hablar|traer|vivir|morir|escuchar|pedir|caer|leer|conocer|empezar|servir|sacar|necesitar|mantener|resultar|parecer|comenzar|encontrar|convertir|conseguir|recordar|terminar|permitir|aparecer|crear|considerar|ganar|suponer|entender|volver|desarrollar|escribir|perder|producir|ocurrir|ofrecer|recibir|cambiar|presentar|explicar|abrir|decidir|cerrar|salir|venir|realizar|intentar|usar|jugar|pensar|estudiar|incluir|continuar|establecer|añadir|formar|aplicar|aprender|responder|trabajar|ayudar|existir)\\b/.test(sample)) {
     return 'es';
   }
   
   // French detection
-  if (/\b(le|de|et|à|un|il|être|et|en|avoir|que|pour|dans|ce|son|une|sur|avec|ne|se|pas|tout|pouvoir|vous|par|grand|dans)\\b/.test(sample)) {
+  if (/\b(le|de|et|à|un|il|être|et|en|avoir|que|pour|dans|ce|son|une|sur|avec|ne|se|pas|tout|plus|pouvoir|par|je|son|que|bien|autre|après|savoir|grand|prendre|aller|voir|en|faire|sans|deux|très|là|venir|un|où|homme|même|dire|elle|temps|quel|eau|peu|sous|écrire|tenir|jouer|ou|comme|donner|mais|demander|grande|premier|fois)\\b/.test(sample)) {
     return 'fr';
   }
   
@@ -92,7 +92,7 @@ const detectLanguageFromContent = (text: string): string => {
 export const Reader: React.FC<ReaderProps> = ({
   book,
   getBookUrl,
-  onLocationChange,
+  onBackToLibrary,
   onProgressUpdate,
 }) => {
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -103,6 +103,129 @@ export const Reader: React.FC<ReaderProps> = ({
   const [canGoNext, setCanGoNext] = useState(false);
   const [canGoPrev, setCanGoPrev] = useState(false);
   const [migakuDetected, setMigakuDetected] = useState(false);
+  const [currentProgress, setCurrentProgress] = useState(book.progress);
+
+  // Debounced progress saving to avoid too frequent updates
+  const saveProgressTimeoutRef = useRef<NodeJS.Timeout>();
+  const lastSavedProgressRef = useRef<{ progress: number; cfi: string; page: number } | null>(null);
+  
+  const saveProgress = useCallback((cfi: string, progress: number, page: number) => {
+    // Update local state immediately
+    setCurrentProgress(progress);
+    
+    // Skip if progress hasn't changed significantly
+    const lastSaved = lastSavedProgressRef.current;
+    if (lastSaved && 
+        Math.abs(lastSaved.progress - progress) < 0.01 && 
+        lastSaved.cfi === cfi) {
+      return;
+    }
+    
+    if (saveProgressTimeoutRef.current) {
+      clearTimeout(saveProgressTimeoutRef.current);
+    }
+    
+    saveProgressTimeoutRef.current = setTimeout(() => {
+      try {
+        if (onProgressUpdate) {
+          onProgressUpdate(book.id, progress, cfi, page);
+          lastSavedProgressRef.current = { progress, cfi, page };
+          console.log(`✅ Progress saved: ${Math.round(progress * 100)}% (Page ${page}, CFI: ${cfi.substring(0, 50)}...)`);
+        } else {
+          console.warn('⚠️ onProgressUpdate callback not provided - progress not saved');
+        }
+      } catch (error) {
+        console.error('❌ Failed to save progress:', error);
+      }
+    }, 1000); // Save after 1 second of no navigation
+  }, [book.id, onProgressUpdate]);
+
+  // Immediate progress save function for critical moments
+  const saveProgressImmediately = useCallback((cfi: string, progress: number, page: number) => {
+    try {
+      setCurrentProgress(progress);
+      if (onProgressUpdate) {
+        onProgressUpdate(book.id, progress, cfi, page);
+        lastSavedProgressRef.current = { progress, cfi, page };
+        console.log(`🚀 Progress saved immediately: ${Math.round(progress * 100)}% (Page ${page})`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to save progress immediately:', error);
+    }
+  }, [book.id, onProgressUpdate]);
+
+  // Manual progress calculation helper
+  const calculateCurrentProgress = useCallback(() => {
+    try {
+      if (!renditionRef.current || !bookRef.current?.locations?.total) {
+        return null;
+      }
+      
+      const currentLocation = renditionRef.current.currentLocation();
+      if (!currentLocation?.start) {
+        return null;
+      }
+      
+      const currentLocationIndex = currentLocation.start.location;
+      const totalLocations = bookRef.current.locations.total;
+      const progress = Math.max(0, Math.min(1, currentLocationIndex / totalLocations));
+      const currentCfi = currentLocation.start.cfi;
+      
+      // Get current page number from spine
+      const spineItem = bookRef.current.spine.get(currentLocation.start.href);
+      const currentPage = spineItem ? bookRef.current.spine.items.indexOf(spineItem) + 1 : 1;
+      
+      return { progress, currentCfi, currentPage };
+    } catch (error) {
+      console.warn('Failed to calculate current progress:', error);
+      return null;
+    }
+  }, []);
+
+  // Navigation functions with explicit progress tracking
+  const goToNext = useCallback(async () => {
+    if (!renditionRef.current || !canGoNext) return;
+    try {
+      await renditionRef.current.next();
+      
+      // Force progress calculation after navigation
+      setTimeout(() => {
+        const progressData = calculateCurrentProgress();
+        if (progressData) {
+          console.log('📍 Manual progress update after next navigation');
+          saveProgress(progressData.currentCfi, progressData.progress, progressData.currentPage);
+        }
+      }, 100);
+    } catch (err) {
+      console.warn('Error navigating to next page:', err);
+      // Fallback navigation
+      if (renditionRef.current && canGoNext) {
+        renditionRef.current.next().catch(console.warn);
+      }
+    }
+  }, [canGoNext, calculateCurrentProgress, saveProgress]);
+
+  const goToPrev = useCallback(async () => {
+    if (!renditionRef.current || !canGoPrev) return;
+    try {
+      await renditionRef.current.prev();
+      
+      // Force progress calculation after navigation
+      setTimeout(() => {
+        const progressData = calculateCurrentProgress();
+        if (progressData) {
+          console.log('📍 Manual progress update after prev navigation');
+          saveProgress(progressData.currentCfi, progressData.progress, progressData.currentPage);
+        }
+      }, 100);
+    } catch (err) {
+      console.warn('Error navigating to previous page:', err);
+      // Fallback navigation
+      if (renditionRef.current && canGoPrev) {
+        renditionRef.current.prev().catch(console.warn);
+      }
+    }
+  }, [canGoPrev, calculateCurrentProgress, saveProgress]);
 
   // Initialize EPUB reader
   useEffect(() => {
@@ -115,6 +238,7 @@ export const Reader: React.FC<ReaderProps> = ({
     }
 
     let isMounted = true;
+    let blobUrl: string | null = null;
     
     // Set up message listener for Migaku communication
     const handleMigakuMessages = (event: MessageEvent) => {
@@ -138,8 +262,9 @@ export const Reader: React.FC<ReaderProps> = ({
         }
 
         const url = await getBookUrl();
+        blobUrl = url; // Store for cleanup
 
-        // Create a new book instance with better error handling
+        // Create a new book instance
         const epubBook = ePub(url, {
           openAs: 'epub'
         });
@@ -176,10 +301,8 @@ export const Reader: React.FC<ReaderProps> = ({
         // Wait for rendition to be ready before setting up hooks
         await rendition.started;
 
-        // Initial display first
+        // Initial display
         await rendition.display(book.currentCfi || undefined);
-
-        console.log('EPUB reader initialized successfully');
 
         // Enhanced Migaku integration with text extraction
         const enhanceMigakuCompatibility = () => {
@@ -197,20 +320,22 @@ export const Reader: React.FC<ReaderProps> = ({
                 iframe.classList.add('migaku-enabled-reader', 'epub-content-frame');
 
                 // Wait for iframe content to load
-                if (iframe.contentDocument || iframe.contentWindow) {
-                  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-                  if (iframeDoc && iframeDoc.readyState === 'complete') {
-                    enhanceIframeContent(iframe, iframeDoc);
-                    extractTextForMigaku(iframe, iframeDoc, index);
-                  } else {
-                    iframe.addEventListener('load', () => {
-                      const doc = iframe.contentDocument || iframe.contentWindow?.document;
-                      if (doc) {
-                        enhanceIframeContent(iframe, doc);
-                        extractTextForMigaku(iframe, doc, index);
-                      }
-                    });
+                const checkAndEnhance = () => {
+                  try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                    if (iframeDoc && iframeDoc.readyState === 'complete') {
+                      enhanceIframeContent(iframe, iframeDoc);
+                      extractTextForMigaku(iframe, iframeDoc, index);
+                    }
+                  } catch (e) {
+                    console.warn('Cannot access iframe content due to security restrictions:', e);
                   }
+                };
+
+                if (iframe.contentDocument || iframe.contentWindow) {
+                  checkAndEnhance();
+                } else {
+                  iframe.addEventListener('load', checkAndEnhance);
                 }
               });
               console.log('Applied enhanced iframe setup for Migaku compatibility');
@@ -236,19 +361,6 @@ export const Reader: React.FC<ReaderProps> = ({
               textMirror.className = 'migaku-text-mirror';
               textMirror.setAttribute('data-migaku-parseable', 'true');
               textMirror.setAttribute('data-epub-page', pageIndex.toString());
-              textMirror.style.cssText = `
-                position: absolute;
-                left: -9999px;
-                top: -9999px;
-                width: 1px;
-                height: 1px;
-                overflow: hidden;
-                opacity: 0;
-                pointer-events: none;
-                font-size: 16px;
-                line-height: 1.6;
-                font-family: inherit;
-              `;
               
               // Detect language
               const language = detectLanguageFromContent(textContent);
@@ -338,48 +450,62 @@ export const Reader: React.FC<ReaderProps> = ({
           }
         };
 
-        // Apply initial Migaku compatibility
+        // Set up event handlers
+        const handleKeyNavigation = (event: KeyboardEvent) => {
+          if (event.key === 'ArrowLeft' && canGoPrev) {
+            event.preventDefault();
+            goToPrev();
+          } else if (event.key === 'ArrowRight' && canGoNext) {
+            event.preventDefault();
+            goToNext();
+          } else if (event.key === 'Escape' && onBackToLibrary) {
+            onBackToLibrary();
+          }
+        };
+
+        // Generate locations for progress tracking
+        await epubBook.locations.generate(1024);
+        console.log(`📍 Generated ${epubBook.locations.total} locations for progress tracking`);
+
+        // Enhanced relocated handler with progress saving
+        const handleRelocated = (location: any) => {
+          console.log('📍 Relocated event fired:', location);
+          setCanGoNext(!location?.atEnd);
+          setCanGoPrev(!location?.atStart);
+          
+          // Calculate and save progress
+          if (location && epubBook.locations.total > 0) {
+            const currentLocation = location.start.location;
+            const totalLocations = epubBook.locations.total;
+            const progress = Math.max(0, Math.min(1, currentLocation / totalLocations));
+            const currentCfi = location.start.cfi;
+            
+            // Get current page number from spine
+            const spineItem = epubBook.spine.get(location.start.href);
+            const currentPage = spineItem ? epubBook.spine.items.indexOf(spineItem) + 1 : 1;
+            
+            console.log(`📍 Reader relocated: ${Math.round(progress * 100)}% (${currentLocation}/${totalLocations}), Page ${currentPage}`);
+            
+            // Save progress with debouncing
+            saveProgress(currentCfi, progress, currentPage);
+          } else {
+            console.warn('⚠️ Location data incomplete for progress tracking:', location);
+          }
+        };
+
+        rendition.on('relocated', handleRelocated);
+
+        // Apply Migaku enhancements when content is rendered
         setTimeout(enhanceMigakuCompatibility, 500);
 
-        // Setup event listeners for page navigation
         rendition.on('rendered', () => {
           setTimeout(enhanceMigakuCompatibility, 300);
         });
 
-        rendition.on('relocated', () => {
-          setTimeout(enhanceMigakuCompatibility, 300);
-        });
-
-        rendition.on('locationChanged', (location: any) => {
-          if (location && location.start) {
-            onLocationChange(location.start.cfi);
-            
-            // Update navigation state
-            setCanGoNext(!location.atEnd);
-            setCanGoPrev(!location.atStart);
-          }
-        });
-
-        // Handle keyboard navigation
-        const handleKeyNavigation = (event: KeyboardEvent) => {
-          if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
-            if (canGoPrev) {
-              rendition.prev().catch(console.warn);
-            }
-          } else if (event.key === 'ArrowRight' || event.key === 'PageDown') {
-            if (canGoNext) {
-              rendition.next().catch(console.warn);
-            }
-          }
-        };
-
         rendition.on('keyup', handleKeyNavigation);
 
-        // Generate locations for progress tracking
-        await epubBook.locations.generate(1024);
-        
         setIsLoading(false);
-        console.log('EPUB reader fully initialized with Migaku compatibility');
+        console.log('EPUB reader initialized successfully with progress tracking');
 
       } catch (err) {
         console.error('Failed to initialize EPUB reader:', err);
@@ -394,7 +520,35 @@ export const Reader: React.FC<ReaderProps> = ({
       isMounted = false;
       window.removeEventListener('message', handleMigakuMessages);
       
-      // Cleanup text mirrors
+      // Save progress immediately on unmount
+      if (renditionRef.current && bookRef.current?.locations?.total > 0) {
+        try {
+          const currentLocation = renditionRef.current.currentLocation();
+          if (currentLocation?.start) {
+            const progress = currentLocation.start.location / bookRef.current.locations.total;
+            const spineItem = bookRef.current.spine.get(currentLocation.start.href);
+            const currentPage = spineItem ? bookRef.current.spine.items.indexOf(spineItem) + 1 : 1;
+            
+            console.log('💾 Saving progress on unmount...');
+            saveProgressImmediately(currentLocation.start.cfi, progress, currentPage);
+          }
+        } catch (error) {
+          console.warn('Failed to save progress on unmount:', error);
+        }
+      }
+      
+      // Clear any pending progress saves
+      if (saveProgressTimeoutRef.current) {
+        clearTimeout(saveProgressTimeoutRef.current);
+      }
+      
+      // Clean up blob URL to prevent memory leaks
+      if (blobUrl && blobUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(blobUrl);
+        console.log('🧹 Cleaned up blob URL:', blobUrl);
+      }
+      
+      // Clean up text mirrors
       const textMirrors = document.querySelectorAll('[id^="migaku-text-mirror-"]');
       textMirrors.forEach(mirror => mirror.remove());
       
@@ -406,81 +560,52 @@ export const Reader: React.FC<ReaderProps> = ({
         }
         renditionRef.current = null;
       }
-      
-      if (bookRef.current) {
-        try {
-          bookRef.current.destroy();
-        } catch (e) {
-          console.warn('Error destroying book:', e);
-        }
-        bookRef.current = null;
-      }
     };
-  }, [book.id, book.currentCfi]);
+  }, [book.id, book.currentCfi, getBookUrl, onBackToLibrary, saveProgress, saveProgressImmediately, goToNext, goToPrev]);
 
-  const goToNext = useCallback(async () => {
-    if (!renditionRef.current || !canGoNext) return;
-    
-    try {
-      await renditionRef.current.next();
-    } catch (error) {
-      console.warn('Navigation error:', error);
-      // Fallback navigation
-      setTimeout(() => {
-        if (renditionRef.current && canGoNext) {
-          renditionRef.current.next().catch(console.warn);
-        }
-      }, 100);
-    }
-  }, [canGoNext]);
-
-  const goToPrev = useCallback(async () => {
-    if (!renditionRef.current || !canGoPrev) return;
-    
-    try {
-      await renditionRef.current.prev();
-    } catch (error) {
-      console.warn('Navigation error:', error);
-      // Fallback navigation
-      setTimeout(() => {
-        if (renditionRef.current && canGoPrev) {
-          renditionRef.current.prev().catch(console.warn);
-        }
-      }, 100);
-    }
-  }, [canGoPrev]);
-
-  const handleViewerClick = useCallback((event: React.MouseEvent) => {
-    if (!renditionRef.current) return;
-    
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const centerX = rect.width / 2;
-    
-    if (x < centerX) {
-      goToPrev();
-    } else {
-      goToNext();
-    }
-  }, [goToNext, goToPrev]);
-
-  if (error) {
+  if (isLoading) {
     return (
-      <div className="reader-container error">
-        <div className="error-message">
-          <h3>Error loading book</h3>
-          <p>{error}</p>
+      <div className="reader-container loading">
+        <div className="reader-header">
+          <button 
+            onClick={onBackToLibrary}
+            className="back-button"
+            aria-label="Back to Library"
+          >
+            ← Back to Library
+          </button>
+          <h1 className="book-title">{book.fileName}</h1>
+        </div>
+        <div className="reader-loading">
+          <div className="loading-spinner" aria-hidden="true"></div>
+          <p>Loading your book...</p>
+          {migakuDetected && (
+            <p className="migaku-status">Migaku extension detected - enhanced features enabled</p>
+          )}
         </div>
       </div>
     );
   }
 
-  if (isLoading) {
+  if (error) {
     return (
-      <div className="reader-container loading">
-        <div className="loading-message">
-          <div className="spinner"></div>
-          <p>Loading book...</p>
+      <div className="reader-container error">
+        <div className="reader-header">
+          <button 
+            onClick={onBackToLibrary}
+            className="back-button"
+            aria-label="Back to Library"
+          >
+            ← Back to Library
+          </button>
+          <h1 className="book-title">{book.fileName}</h1>
+        </div>
+        <div className="reader-error">
+          <h2>Failed to Load Book</h2>
+          <p>{error}</p>
+          <button onClick={onBackToLibrary} className="retry-button">
+            Return to Library
+          </button>
         </div>
       </div>
     );
@@ -488,37 +613,65 @@ export const Reader: React.FC<ReaderProps> = ({
 
   return (
     <div className="reader-container">
-      <div 
-        ref={viewerRef} 
-        className="epub-viewer"
-        onClick={handleViewerClick}
-        style={{ height: '100%', width: '100%' }}
-      />
-      
-      <div className="reader-controls">
+      <div className="reader-header">
         <button 
-          onClick={goToPrev} 
-          disabled={!canGoPrev}
-          className="nav-button prev-button"
-          aria-label="Previous page"
+          onClick={onBackToLibrary}
+          className="back-button"
+          aria-label="Back to Library"
         >
-          ←
+          ← Back to Library
         </button>
-        <button 
-          onClick={goToNext} 
-          disabled={!canGoNext}
-          className="nav-button next-button"
-          aria-label="Next page"
-        >
-          →
-        </button>
+        <h1 className="book-title">{book.fileName}</h1>
+        <div className="progress-info">
+          <span className="progress-text">
+            {Math.round(currentProgress * 100)}% complete
+          </span>
+          {migakuDetected && (
+            <span className="migaku-indicator" title="Migaku extension active">
+              🔤
+            </span>
+          )}
+        </div>
       </div>
       
-      {migakuDetected && (
-        <div className="migaku-status">
-          Migaku extension detected - Enhanced compatibility enabled
+      <div className="reader-content">
+        <div 
+          ref={viewerRef}
+          className="epub-viewer"
+          onClick={handleViewerClick}
+          role="main"
+          aria-label="Book content"
+          tabIndex={0}
+        />
+        
+        <div className="reader-controls">
+          <button
+            onClick={goToPrev}
+            disabled={!canGoPrev}
+            className="nav-button prev-button"
+            aria-label="Previous page"
+          >
+            ← Previous
+          </button>
+          
+          <div className="progress-bar">
+            <div 
+              className="progress-fill"
+              style={{ width: `${currentProgress * 100}%` }}
+              aria-hidden="true"
+            />
+          </div>
+          
+          <button
+            onClick={goToNext}
+            disabled={!canGoNext}
+            className="nav-button next-button"
+            aria-label="Next page"
+          >
+            Next →
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 };

@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Reader } from './components/Reader.tsx';
 import { DirectEpubReader } from './components/DirectEpubReader';
-import { FileDrop } from './components/FileDrop';
 import { ProgressBar } from './components/ProgressBar';
 import { ThemeToggle } from './components/ThemeToggle';
-import { uploadToS3, getSignedBookUrl, listBooksInS3 } from './services/s3';
+import { googleDriveService } from './services/googleDrive';
 import { CoverArtService } from './services/coverArt';
 import './App.css';
 
@@ -21,7 +20,7 @@ export interface Book {
   id: string;
   fileName: string;
   coverUrl: string | null;
-  s3Key: string; // Changed from fileData to s3Key
+  googleDriveId: string; 
   progress: number;
   currentPage: number;
   currentCfi?: string;
@@ -39,10 +38,12 @@ function App() {
   const [settings, setSettings] = useState({
     hideDebugButtons: false,
     hideCoverFetchButton: false,
-    compactView: false
+    compactView: false,
+    doublePageView: false // NEW: double page view setting
   });
   const [hiddenBooks, setHiddenBooks] = useState<Set<string>>(new Set());
   const [showHiddenBooks, setShowHiddenBooks] = useState<boolean>(false);
+  const [isGoogleDriveAuthenticated, setIsGoogleDriveAuthenticated] = useState<boolean>(false);
 
   const currentBook = useMemo(() => 
     library.find(book => book.id === currentBookId),
@@ -127,7 +128,8 @@ function App() {
         const appState = JSON.parse(appStateJson);
         
         if (appState.currentBookId) {
-          setCurrentBookId(appState.currentBookId);
+          // Don't automatically restore the current book, just remember it
+          // setCurrentBookId(appState.currentBookId);
         }
         if (appState.settings) {
           setSettings(appState.settings);
@@ -139,12 +141,19 @@ function App() {
         console.error('Error loading app state:', error);
       }
     }
+    // Check Google Drive authentication status
+    setIsGoogleDriveAuthenticated(googleDriveService.isAuthenticated());
   }, []); // Run once on mount
 
-  // Load books from both localStorage and S3
+  // Load books from both localStorage and Google Drive
   useEffect(() => {
     const loadBooks = async () => {
       setError(null);
+      if (!isGoogleDriveAuthenticated) {
+        // Don't load books if not authenticated, show connect button instead
+        setLibrary([]); // Clear library if not authenticated
+        return;
+      }
       try {
         console.log('📚 Loading books from storage...');
         
@@ -152,24 +161,28 @@ function App() {
         const storedBooksJson = localStorage.getItem(BOOKS_KEY);
         let storedBooks: Book[] = storedBooksJson ? JSON.parse(storedBooksJson) : [];
         
-        // Then get list of books from S3
-        const s3Books = await listBooksInS3();
+        // Then get list of books from Google Drive
+        const driveBooks = await googleDriveService.listBooks();
         
-        // Merge S3 books with stored books
-        const updatedLibrary = s3Books.map(s3Book => {
+        // Merge Google Drive books with stored books
+        const updatedLibrary = driveBooks.map(driveBook => {
           // Try to find existing metadata
-          const existingBook = storedBooks.find(stored => stored.s3Key === s3Book.key);
+          const existingBook = storedBooks.find(stored => stored.googleDriveId === driveBook.id);
           if (existingBook) {
-            return existingBook;
+            return {
+              ...existingBook,
+              fileName: driveBook.fileName, // Update filename in case it changed in Drive
+              // size and modifiedTime could also be updated if needed
+            };
           }
           
           // Create new book entry if not found
-          const fileType = s3Book.fileName.toLowerCase().endsWith('.pdf') ? 'pdf' as const : 'epub' as const;
+          const fileType = driveBook.fileName.toLowerCase().endsWith('.pdf') ? 'pdf' as const : 'epub' as const;
           const newBook = {
-            id: crypto.randomUUID(),
-            fileName: s3Book.fileName,
+            id: crypto.randomUUID(), // Use a local UUID for the book entry
+            fileName: driveBook.fileName,
             coverUrl: null,
-            s3Key: s3Book.key,
+            googleDriveId: driveBook.id, // Store Google Drive file ID
             progress: 0,
             currentPage: 1,
             currentCfi: undefined,
@@ -177,108 +190,37 @@ function App() {
           } satisfies Book;
           return newBook;
         });
-
-        // FOR TESTING: Add multiple mock books if library is empty
-        if (updatedLibrary.length === 0) {
-          console.log('📖 No books found, adding mock books for testing...');
-          const mockBooks: Book[] = [
-            {
-              id: 'test-book-1',
-              fileName: 'The Great Gatsby - F. Scott Fitzgerald.epub',
-              coverUrl: null,
-              s3Key: 'test/gatsby.epub',
-              progress: 0.3,
-              currentPage: 5,
-              type: 'epub'
-            },
-            {
-              id: 'test-book-2',
-              fileName: 'To Kill a Mockingbird - Harper Lee.epub',
-              coverUrl: null,
-              s3Key: 'test/mockingbird.epub',
-              progress: 0.7,
-              currentPage: 12,
-              type: 'epub'
-            },
-            {
-              id: 'test-book-3',
-              fileName: '1984 by George Orwell.epub',
-              coverUrl: null,
-              s3Key: 'test/1984.epub',
-              progress: 0.1,
-              currentPage: 2,
-              type: 'epub'
-            },
-            {
-              id: 'test-book-4',
-              fileName: 'Pride and Prejudice - Jane Austen.epub',
-              coverUrl: null,
-              s3Key: 'test/pride.epub',
-              progress: 0.5,
-              currentPage: 8,
-              type: 'epub'
-            },
-            {
-              id: 'test-book-5',
-              fileName: 'The Catcher in the Rye - J.D. Salinger.pdf',
-              coverUrl: null,
-              s3Key: 'test/catcher.pdf',
-              progress: 0.2,
-              currentPage: 3,
-              type: 'pdf'
-            }
-          ];
-          updatedLibrary.push(...mockBooks);
-          console.log('✅ Mock books added for testing');
-        }
         
         setLibrary(updatedLibrary);
         
-        // Restore last opened book
+        // Restore last opened book (but don't auto-open, just remember for later)
         const lastBookId = localStorage.getItem(`${STORAGE_PREFIX}lastBookId`);
         if (lastBookId && updatedLibrary.some(b => b.id === lastBookId)) {
-          setCurrentBookId(lastBookId);
+          // Don't automatically open the book, just remember it was the last one
+          // setCurrentBookId(lastBookId);
         }
 
         // Save merged library back to localStorage
         localStorage.setItem(BOOKS_KEY, JSON.stringify(updatedLibrary));
         
-        // Fetch cover art for books that don't have covers yet (always run for testing)
+        // Fetch cover art for books that don't have covers yet
         console.log('🎬 Starting cover fetching process...');
         await fetchMissingCovers(updatedLibrary);
         console.log('🎬 Cover fetching completed');
       } catch (error) {
-        console.error('Error loading books:', error);
-        setError(error instanceof Error ? error.message : 'Failed to load books. Please check your connection and try again.');
+        console.error('Error loading books from Google Drive:', error);
+        if (error instanceof Error && error.message.includes('authentication expired')) {
+          setIsGoogleDriveAuthenticated(false); // Update auth state
+          setError('Google Drive session expired. Please reconnect.');
+        } else {
+          setError(error instanceof Error ? error.message : 'Failed to load books from Google Drive. Please check your connection and try again.');
+        }
       }
     };
 
     loadBooks();
-  }, [fetchMissingCovers]); // Add fetchMissingCovers as dependency to prevent stale closure
+  }, [fetchMissingCovers, isGoogleDriveAuthenticated]); // Add isGoogleDriveAuthenticated
 
-
-  const handleLocationChange = useCallback((bookId: string, cfi: string): void => {
-    setLibrary(prev => prev.map(book => {
-      if (book.id !== bookId) return book;
-      
-      // Extract page number from CFI if it's from DirectEpubReader
-      let currentPage = book.currentPage;
-      if (cfi.startsWith('page-')) {
-        const pageIndex = parseInt(cfi.replace('page-', ''));
-        if (!isNaN(pageIndex)) {
-          currentPage = pageIndex + 1; // Convert 0-based index to 1-based page number
-        }
-      }
-      
-      return { ...book, currentCfi: cfi, currentPage };
-    }));
-  }, []);
-
-  const handleProgressUpdate = useCallback((bookId: string, progress: number): void => {
-    setLibrary(prev => prev.map(book => 
-      book.id === bookId ? { ...book, progress } : book
-    ));
-  }, []);
 
   // Memoize the getBookUrl function to prevent unnecessary re-renders
   const getBookUrlForCurrentBook = useCallback(async (): Promise<string> => {
@@ -286,70 +228,17 @@ function App() {
       throw new Error('No current book selected');
     }
     
-    // FOR TESTING: Return a fake URL for mock books
-    if (currentBook.id === 'test-book-1') {
-      console.log('📖 Returning mock URL for test book');
-      return 'data:text/plain;base64,UEsDBAoAAAAAA'; // Invalid but won't crash
-    }
+    console.log(`📖 Getting URL for book: ${currentBook.fileName} (Google Drive ID: ${currentBook.googleDriveId})`);
     
-    return await getSignedBookUrl(currentBook.s3Key);
-  }, [currentBook]);
-
-  // Memoize the callback functions to prevent DirectEpubReader from remounting
-  const handleCurrentBookLocationChange = useCallback((cfi: string) => {
-    if (currentBookId) {
-      handleLocationChange(currentBookId, cfi);
-    }
-  }, [currentBookId, handleLocationChange]);
-
-  const handleCurrentBookProgressUpdate = useCallback((progress: number) => {
-    if (currentBookId) {
-      handleProgressUpdate(currentBookId, progress);
-    }
-  }, [currentBookId, handleProgressUpdate]);
-
-  const handleFileDrop = useCallback(async (file: File) => {
     try {
-      setError(null);
-      
-      // Generate a unique key for S3
-      const s3Key = `books/${crypto.randomUUID()}/${file.name}`;
-      
-      // Upload file to S3
-      await uploadToS3(file, s3Key);
-
-      // Extract book info for cover art search
-      const bookInfo = CoverArtService.extractBookInfo(file.name);
-      
-      // Try to fetch cover art
-      let coverUrl: string | null = null;
-      try {
-        const coverResult = await CoverArtService.searchCover(bookInfo.title, bookInfo.author);
-        if (coverResult && await CoverArtService.validateCoverUrl(coverResult.coverUrl)) {
-          coverUrl = coverResult.coverUrl;
-          console.log(`✅ Found cover art from ${coverResult.source}:`, coverUrl);
-        }
-      } catch (coverError) {
-        console.warn('Failed to fetch cover art:', coverError);
-      }
-
-      const newBook: Book = {
-        id: crypto.randomUUID(),
-        fileName: file.name,
-        coverUrl,
-        s3Key,
-        progress: 0,
-        currentPage: 1,
-        type: file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'epub'
-      };
-
-      setLibrary(prev => [...prev, newBook]);
-      setCurrentBookId(newBook.id);
+      const url = await googleDriveService.getBookUrl(currentBook.googleDriveId);
+      console.log(`✅ Successfully got book URL for ${currentBook.fileName}`);
+      return url;
     } catch (error) {
-      console.error('Error processing file:', error);
-      setError(error instanceof Error ? error.message : 'Failed to upload book. Please try again.');
+      console.error(`❌ Failed to get book URL for ${currentBook.fileName}:`, error);
+      throw error;
     }
-  }, []);
+  }, [currentBook]);
 
   // Persist library changes
   useEffect(() => {
@@ -396,6 +285,34 @@ function App() {
     setCurrentBookId(bookId);
   }, []);
 
+  // Handle progress updates from the reader
+  const handleProgressUpdate = useCallback((bookId: string, progress: number, currentCfi: string, currentPage: number) => {
+    console.log(`📊 Progress update received: ${bookId} - ${Math.round(progress * 100)}% (Page ${currentPage})`);
+    
+    setLibrary(prev => {
+      const updatedLibrary = prev.map(book => 
+        book.id === bookId 
+          ? { ...book, progress, currentPage, currentCfi }
+          : book
+      );
+      
+      // Save to localStorage immediately
+      localStorage.setItem(BOOKS_KEY, JSON.stringify(updatedLibrary));
+      
+      return updatedLibrary;
+    });
+  }, []);
+
+  // Handle going back to library with immediate progress save
+  const handleBackToLibrary = useCallback(() => {
+    console.log('📚 Returning to library, ensuring progress is saved...');
+    
+    // Give a moment for any pending progress saves to complete
+    setTimeout(() => {
+      setCurrentBookId(null);
+    }, 100);
+  }, []);
+
   // Book management functions
   const handleHideBook = useCallback((bookId: string) => {
     setHiddenBooks(prev => new Set(prev).add(bookId));
@@ -430,6 +347,79 @@ function App() {
     });
   }, []);
 
+  const handleConnectGoogleDrive = async () => {
+    try {
+      setError(null);
+      const success = await googleDriveService.authenticate();
+      setIsGoogleDriveAuthenticated(success);
+      if (!success) {
+        setError("Failed to connect to Google Drive.");
+      }
+    } catch (authError) {
+      console.error("Google Drive authentication error:", authError);
+      setError(authError instanceof Error ? authError.message : "Failed to connect to Google Drive.");
+    }
+  };
+
+  const handleDisconnectGoogleDrive = () => {
+    googleDriveService.disconnect();
+    setIsGoogleDriveAuthenticated(false);
+    setLibrary([]); // Clear library on disconnect
+    setCurrentBookId(null); // Clear current book
+    localStorage.removeItem(BOOKS_KEY); // Clear stored books
+    localStorage.removeItem(`${STORAGE_PREFIX}lastBookId`); // Clear last book ID
+    // Optionally, clear other related localStorage items
+  };
+
+  const handleRefreshLibrary = async () => {
+    if (!isGoogleDriveAuthenticated) return;
+    
+    try {
+      setError(null);
+      console.log('🔄 Refreshing library...');
+      
+      // Clear cached folder ID to force a fresh search
+      localStorage.removeItem('googleDriveBooksFolder');
+      
+      // Reload books
+      const driveBooks = await googleDriveService.listBooks();
+      console.log('📚 Refreshed books:', driveBooks);
+      
+      // Create new library from fresh data
+      const updatedLibrary = driveBooks.map(driveBook => {
+        const fileType = driveBook.fileName.toLowerCase().endsWith('.pdf') ? 'pdf' as const : 'epub' as const;
+        return {
+          id: crypto.randomUUID(),
+          fileName: driveBook.fileName,
+          coverUrl: null,
+          googleDriveId: driveBook.id,
+          progress: 0,
+          currentPage: 1,
+          currentCfi: undefined,
+          type: fileType
+        } satisfies Book;
+      });
+      
+      setLibrary(updatedLibrary);
+      localStorage.setItem(BOOKS_KEY, JSON.stringify(updatedLibrary));
+      
+    } catch (error) {
+      console.error('Error refreshing library:', error);
+      setError(error instanceof Error ? error.message : 'Failed to refresh library');
+    }
+  };
+
+  // Listen for doublePageViewChange event and update app state
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (typeof e.detail === 'boolean') {
+        setSettings(prev => ({ ...prev, doublePageView: e.detail }));
+      }
+    };
+    window.addEventListener('doublePageViewChange', handler);
+    return () => window.removeEventListener('doublePageViewChange', handler);
+  }, []);
+
   return (
     <div className="app">
       {error ? (
@@ -445,13 +435,7 @@ function App() {
       ) : currentBook ? (
         <div className="reader-view">
           {/* Back button to return to library */}
-          <button 
-              onClick={() => setCurrentBookId(null)}
-              className="back-button"
-              aria-label="Back to library"
-            >
-              ← Back to Library
-            </button>
+          
           
           
           <div className="reader-content">
@@ -459,17 +443,15 @@ function App() {
               <DirectEpubReader
                 book={currentBook}
                 getBookUrl={getBookUrlForCurrentBook}
-                onLocationChange={handleCurrentBookLocationChange}
-                onProgressUpdate={handleCurrentBookProgressUpdate}
-                onBackToLibrary={() => setCurrentBookId(null)}
+                onBackToLibrary={handleBackToLibrary}
+                onProgressUpdate={handleProgressUpdate}
               />
             ) : (
               <Reader
                 book={currentBook}
                 getBookUrl={getBookUrlForCurrentBook}
-                onLocationChange={handleCurrentBookLocationChange}
-                onProgressUpdate={handleCurrentBookProgressUpdate}
-                onBackToLibrary={() => setCurrentBookId(null)}
+                onBackToLibrary={handleBackToLibrary}
+                onProgressUpdate={handleProgressUpdate}
               />
             )}
           </div>
@@ -491,7 +473,14 @@ function App() {
             </div>
           </div>
           
-          {library.length > 0 ? (
+          {!isGoogleDriveAuthenticated ? (
+            <div className="google-drive-connect">
+              <p>Connect to Google Drive to access your books.</p>
+              <button onClick={handleConnectGoogleDrive} className="connect-button">
+                Connect to Google Drive
+              </button>
+            </div>
+          ) : library.length > 0 ? (
             <>
               {/* Visible Books */}
               <div className={`book-grid ${settings.compactView ? 'compact' : ''}`}>
@@ -615,7 +604,11 @@ function App() {
               )}
             </>
           ) : (
-            <FileDrop onFileDrop={handleFileDrop} />
+            // Updated message for when library is empty and authenticated
+            <div className="empty-library-message">
+              <p>No books found in your Google Drive 'books' folder.</p>
+              <p>Add EPUB or PDF files to the 'books' folder in your Google Drive, then refresh the app.</p>
+            </div>
           )}
           
           {/* Settings Panel Overlay */}
@@ -656,19 +649,30 @@ function App() {
                   <div className="settings-section">
                     <h4>Library Actions</h4>
                     <div className="library-actions">
-                      <button 
-                        onClick={() => fetchMissingCovers(library)}
-                        className="fetch-covers-btn"
-                        disabled={isLoadingCovers || library.filter(book => !book.coverUrl).length === 0}
-                      >
-                        {isLoadingCovers ? '⏳ Fetching Covers...' : `🖼️ Fetch Missing Covers (${library.filter(book => !book.coverUrl).length})`}
-                      </button>
+                      {isGoogleDriveAuthenticated && (
+                        <>
+                          <button 
+                            onClick={handleRefreshLibrary}
+                            className="refresh-library-btn"
+                          >
+                            🔄 Refresh Library
+                          </button>
+                          <button 
+                            onClick={() => fetchMissingCovers(library)}
+                            className="fetch-covers-btn"
+                            disabled={isLoadingCovers || library.filter(book => !book.coverUrl).length === 0}
+                          >
+                            {isLoadingCovers ? '⏳ Fetching Covers...' : `🖼️ Fetch Missing Covers (${library.filter(book => !book.coverUrl).length})`}
+                          </button>
+                        </>
+                      )}
                       <button 
                         onClick={() => {
                           console.log('📚 Current library state:', library);
                           console.log('❌ Failed covers:', Array.from(failedCovers));
                           console.log('🔒 Hidden books:', Array.from(hiddenBooks));
                           console.log('📖 App state in localStorage:', localStorage.getItem(APP_STATE_KEY));
+                          console.log('🔐 Google Drive auth status:', googleDriveService.isAuthenticated());
                           library.forEach(book => {
                             console.log(`📖 Book "${book.fileName}": coverUrl="${book.coverUrl}", failed=${failedCovers.has(book.id)}, hidden=${hiddenBooks.has(book.id)}`);
                           });
@@ -680,7 +684,18 @@ function App() {
                     </div>
                   </div>
 
-                  
+                  <div className="settings-section">
+                    <h4>Google Drive</h4>
+                    {isGoogleDriveAuthenticated ? (
+                      <button onClick={handleDisconnectGoogleDrive} className="disconnect-button">
+                        Disconnect Google Drive
+                      </button>
+                    ) : (
+                      <button onClick={handleConnectGoogleDrive} className="connect-button">
+                        Connect to Google Drive
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </>

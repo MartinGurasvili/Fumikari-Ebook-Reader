@@ -15,7 +15,7 @@ interface Book {
   id: string;
   fileName: string;
   coverUrl: string | null;
-  s3Key: string;
+  googleDriveId: string;
   progress: number;
   currentPage: number;
   currentCfi?: string;
@@ -25,9 +25,8 @@ interface Book {
 interface ReaderProps {
   book: Book;
   getBookUrl: () => Promise<string>;
-  onLocationChange: (cfi: string) => void;
-  onProgressUpdate: (progress: number) => void;
   onBackToLibrary?: () => void;
+  onProgressUpdate?: (bookId: string, progress: number, currentCfi: string, currentPage: number) => void;
 }
 
 interface EpubChapter {
@@ -72,55 +71,11 @@ const detectMigakuExtension = (): boolean => {
   }
 };
 
-// Simple language detection based on common words and patterns
-const detectLanguageFromContent = (text: string): string => {
-  const sample = text.substring(0, 1000).toLowerCase();
-  
-  // Japanese detection (hiragana, katakana, kanji)
-  if (/[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/.test(sample)) {
-    return 'ja';
-  }
-  
-  // Chinese detection (simplified/traditional Chinese characters)
-  if (/[\u4e00-\u9fff]/.test(sample)) {
-    return 'zh';
-  }
-  
-  // Korean detection (Hangul)
-  if (/[\uac00-\ud7af]/.test(sample)) {
-    return 'ko';
-  }
-  
-  // Spanish detection
-  if (/\b(el|la|de|que|y|a|en|un|es|se|no|te|lo|le|da|su|por|son|con|para|una|sobre|todo|pero|más|me|hasta|donde|quien|desde|porque|cuando)\b/.test(sample)) {
-    return 'es';
-  }
-  
-  // French detection
-  if (/\b(le|de|et|à|un|il|être|et|en|avoir|que|pour|dans|ce|son|une|sur|avec|ne|se|pas|tout|pouvoir|vous|par|grand|dans)\b/.test(sample)) {
-    return 'fr';
-  }
-  
-  // German detection
-  if (/\b(der|die|und|in|den|von|zu|das|mit|sich|des|auf|für|ist|im|dem|nicht|ein|eine|als|auch|es|an|werden|aus|er|hat|dass|sie|nach|wird|bei|einer|um|am|sind|noch|wie|einem|über|einen|so|zum|war|haben|nur|oder|aber|vor|zur|bis|unter|während|des)\b/.test(sample)) {
-    return 'de';
-  }
-  
-  // Russian detection
-  if (/[а-яё]/i.test(sample)) {
-    return 'ru';
-  }
-  
-  // Default to English
-  return 'en';
-};
-
 const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
   book,
   getBookUrl,
-  onLocationChange,
-  onProgressUpdate,
   onBackToLibrary,
+  onProgressUpdate
 }) => {
   const viewerRef = useRef<HTMLDivElement>(null);
   const initializationRef = useRef<string | null>(null);
@@ -139,6 +94,7 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
     margin: 40,
     theme: 'light'
   });
+  const [doublePageView, setDoublePageView] = useState<boolean>(false);
 
   // Set mounted ref on mount and cleanup on unmount
   useEffect(() => {
@@ -166,8 +122,8 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
     document.body.appendChild(tempContainer);
     
     try {
-      const pageHeight = window.innerHeight - 200; // Account for navigation
-      
+      // Use a smaller page height to ensure content fits without scroll
+      const pageHeight = Math.floor((window.innerHeight - 240) * 0.92); // 8% smaller than before
       chapters.forEach((chapter) => {
         // Parse chapter content
         const tempDiv = document.createElement('div');
@@ -184,19 +140,14 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
         
         elements.forEach((element) => {
           const elementHtml = element.outerHTML || element.textContent || '';
-          
-          // Test if adding this element would exceed page height
           tempContainer.innerHTML = currentPageContent + elementHtml;
-          
           if (tempContainer.scrollHeight > pageHeight && currentPageContent.trim() !== '') {
-            // Current page is full, save it and start a new page
             pages.push({
               id: `page-${pages.length + 1}`,
               content: currentPageContent,
               chapterTitle: chapter.title,
               pageNumber: pageNumber
             });
-            
             currentPageContent = elementHtml;
             pageNumber++;
           } else {
@@ -516,122 +467,187 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
     }
   }, [textSettings.fontSize, textSettings.fontFamily, textSettings.lineHeight, textSettings.margin]);
 
-  // Render current page
+  // Render current page with applied settings
   useEffect(() => {
     if (!viewerRef.current || pages.length === 0 || isLoading) return;
 
-    const currentPage = pages[currentPageIndex];
-    if (!currentPage) return;
-
-    // Clear previous content
     viewerRef.current.innerHTML = '';
 
-    // Create page container
-    const pageContainer = document.createElement('div');
-    pageContainer.className = 'epub-page';
-    pageContainer.setAttribute('data-page-id', currentPage.id);
-    pageContainer.setAttribute('data-page-index', currentPageIndex.toString());
-    
-    // Set language for Migaku
-    if (metadata?.language) {
-      pageContainer.setAttribute('lang', metadata.language);
-    } else {
-      // Detect language from content
-      const detectedLang = detectLanguageFromContent(currentPage.content);
-      pageContainer.setAttribute('lang', detectedLang);
-    }
+    if (doublePageView && pages.length > 1) {
+      // Double page view
+      const leftPage = pages[currentPageIndex];
+      const rightPage = pages[currentPageIndex + 1];
+      
+      const container = document.createElement('div');
+      container.className = 'epub-double-page-container';
+      container.style.cssText = `
+        display: flex;
+        gap: 2rem;
+        height: 100%;
+        width: 100%;
+        justify-content: center;
+        align-items: flex-start;
+        overflow: auto;
+        padding: ${textSettings.margin}px;
+        box-sizing: border-box;
+      `;
 
-    // Add Migaku-specific attributes
-    if (migakuDetected) {
-      pageContainer.setAttribute('data-migaku-parseable', 'true');
-      pageContainer.setAttribute('data-epub-content', 'true');
-      pageContainer.setAttribute('data-epub-page', currentPageIndex.toString());
-      pageContainer.classList.add('migaku-enabled-content');
-    }
-
-    // Apply text settings
-    pageContainer.style.fontSize = `${textSettings.fontSize}px`;
-    pageContainer.style.fontFamily = textSettings.fontFamily;
-    pageContainer.style.lineHeight = textSettings.lineHeight.toString();
-    pageContainer.style.padding = `${textSettings.margin}px`;
-    
-    // Apply theme
-    switch (textSettings.theme) {
-      case 'dark':
-        pageContainer.style.backgroundColor = '#1a1a1a';
-        pageContainer.style.color = '#e0e0e0';
-        break;
-      case 'sepia':
-        pageContainer.style.backgroundColor = '#f4f1ea';
-        pageContainer.style.color = '#5c4b37';
-        break;
-      default:
-        pageContainer.style.backgroundColor = '#ffffff';
-        pageContainer.style.color = '#333333';
-    }
-
-    // Set page content
-    pageContainer.innerHTML = currentPage.content;
-
-    // Add Migaku attributes to all text elements
-    if (migakuDetected) {
-      const textElements = pageContainer.querySelectorAll('p, div, span, h1, h2, h3, h4, h5, h6, td, th, li, blockquote, pre');
-      textElements.forEach(element => {
-        element.setAttribute('data-migaku-parseable', 'true');
-        element.setAttribute('data-epub-text', 'true');
+      [leftPage, rightPage].forEach((page, idx) => {
+        if (!page) return;
+        
+        const pageContainer = document.createElement('div');
+        pageContainer.className = 'epub-page';
+        pageContainer.setAttribute('data-page-id', page.id);
+        pageContainer.setAttribute('data-page-index', (currentPageIndex + idx).toString());
+        pageContainer.innerHTML = page.content;
+        
+        // Apply text settings
+        pageContainer.style.cssText = `
+          flex: 1;
+          max-width: 50%;
+          min-width: 300px;
+          font-size: ${textSettings.fontSize}px;
+          font-family: ${textSettings.fontFamily};
+          line-height: ${textSettings.lineHeight};
+          color: ${textSettings.theme === 'dark' ? '#ffffff' : textSettings.theme === 'sepia' ? '#5c4a37' : '#1a1a1a'};
+          background: ${textSettings.theme === 'dark' ? '#1a1a1a' : textSettings.theme === 'sepia' ? '#f4f1ea' : '#ffffff'};
+          padding: 2rem 1.5rem;
+          border-radius: 8px;
+          overflow: auto;
+          user-select: text;
+          text-rendering: optimizeLegibility;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        `;
+        
+        container.appendChild(pageContainer);
       });
+      
+      viewerRef.current.appendChild(container);
+    } else {
+      // Single page view
+      const currentPage = pages[currentPageIndex];
+      if (!currentPage) return;
+      
+      const pageContainer = document.createElement('div');
+      pageContainer.className = 'epub-page';
+      pageContainer.setAttribute('data-page-id', currentPage.id);
+      pageContainer.setAttribute('data-page-index', currentPageIndex.toString());
+      pageContainer.innerHTML = currentPage.content;
+      
+      // Apply text settings
+      pageContainer.style.cssText = `
+        max-width: 800px;
+        width: 100%;
+        margin: 0 auto;
+        font-size: ${textSettings.fontSize}px;
+        font-family: ${textSettings.fontFamily};
+        line-height: ${textSettings.lineHeight};
+        color: ${textSettings.theme === 'dark' ? '#ffffff' : textSettings.theme === 'sepia' ? '#5c4a37' : '#1a1a1a'};
+        background: ${textSettings.theme === 'dark' ? '#1a1a1a' : textSettings.theme === 'sepia' ? '#f4f1ea' : '#ffffff'};
+        padding: ${textSettings.margin}px;
+        border-radius: 8px;
+        overflow: auto;
+        user-select: text;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      `;
+      
+      viewerRef.current.appendChild(pageContainer);
     }
 
-    // Append to viewer
-    viewerRef.current.appendChild(pageContainer);
-
-    // Trigger Migaku events
-    if (migakuDetected) {
-      setTimeout(() => {
-        // Dispatch content ready events for Migaku
-        const events = [
-          new Event('DOMContentLoaded', { bubbles: true }),
-          new CustomEvent('migaku-content-ready', {
-            detail: {
-              source: 'direct-epub-reader',
-              pageIndex: currentPageIndex,
-              chapterTitle: currentPage.chapterTitle,
-              language: pageContainer.getAttribute('lang')
-            },
-            bubbles: true
-          })
-        ];
-
-        events.forEach(event => {
-          pageContainer.dispatchEvent(event);
-          document.dispatchEvent(event);
-        });
-
-        console.log(`Page ${currentPageIndex + 1} rendered for Migaku: ${currentPage.chapterTitle}`);
-      }, 100);
+    // Apply theme to viewer container
+    if (viewerRef.current) {
+      viewerRef.current.style.background = textSettings.theme === 'dark' ? '#0d1117' : textSettings.theme === 'sepia' ? '#f7f3e9' : '#fafafa';
     }
+  }, [currentPageIndex, pages, isLoading, textSettings, doublePageView]);
 
-    // Update progress
-    const progress = pages.length > 0 ? (currentPageIndex + 1) / pages.length : 0;
-    onProgressUpdate(progress);
-
-    // Update location (using page index as CFI equivalent)
-    onLocationChange(`page-${currentPageIndex}`);
-
-  }, [currentPageIndex, pages, metadata, migakuDetected, isLoading, textSettings, onProgressUpdate, onLocationChange]);
-
-  // Navigation functions
+  // Enhanced navigation for double page view
   const goToNext = useCallback(() => {
-    if (currentPageIndex < pages.length - 1) {
-      setCurrentPageIndex(prev => prev + 1);
+    const increment = doublePageView ? 2 : 1;
+    if (currentPageIndex + increment <= pages.length - 1) {
+      const newPageIndex = Math.min(currentPageIndex + increment, pages.length - 1);
+      setCurrentPageIndex(newPageIndex);
+      console.log(`📖 Navigated to next page(s): ${newPageIndex + 1}/${pages.length}`);
     }
-  }, [currentPageIndex, pages.length]);
+  }, [currentPageIndex, pages.length, doublePageView]);
 
   const goToPrev = useCallback(() => {
-    if (currentPageIndex > 0) {
-      setCurrentPageIndex(prev => prev - 1);
+    const decrement = doublePageView ? 2 : 1;
+    if (currentPageIndex - decrement >= 0) {
+      const newPageIndex = Math.max(currentPageIndex - decrement, 0);
+      setCurrentPageIndex(newPageIndex);
+      console.log(`📖 Navigated to previous page(s): ${newPageIndex + 1}/${pages.length}`);
     }
-  }, [currentPageIndex]);
+  }, [currentPageIndex, doublePageView]);
+
+  // Debounced progress saving to avoid too frequent updates
+  const saveProgressTimeoutRef = useRef<NodeJS.Timeout>();
+  
+  const saveProgress = useCallback((pageIndex: number, totalPages: number) => {
+    if (!onProgressUpdate || totalPages === 0) return;
+    
+    const progress = Math.max(0, Math.min(1, pageIndex / totalPages));
+    const currentPage = pageIndex + 1; // Convert to 1-based page number
+    const currentCfi = `page-${pageIndex + 1}`; // Simple CFI-like identifier
+    
+    if (saveProgressTimeoutRef.current) {
+      clearTimeout(saveProgressTimeoutRef.current);
+    }
+    
+    saveProgressTimeoutRef.current = setTimeout(() => {
+      try {
+        onProgressUpdate(book.id, progress, currentCfi, currentPage);
+        console.log(`✅ Progress saved: ${Math.round(progress * 100)}% (Page ${currentPage}/${totalPages})`);
+      } catch (error) {
+        console.error('❌ Failed to save progress:', error);
+      }
+    }, 1000); // Save after 1 second of no navigation
+  }, [book.id, onProgressUpdate]);
+
+  // Immediate progress save function for critical moments
+  const saveProgressImmediately = useCallback((pageIndex: number, totalPages: number) => {
+    if (!onProgressUpdate || totalPages === 0) return;
+    
+    const progress = Math.max(0, Math.min(1, pageIndex / totalPages));
+    const currentPage = pageIndex + 1;
+    const currentCfi = `page-${pageIndex + 1}`;
+    
+    try {
+      onProgressUpdate(book.id, progress, currentCfi, currentPage);
+      console.log(`🚀 Progress saved immediately: ${Math.round(progress * 100)}% (Page ${currentPage}/${totalPages})`);
+    } catch (error) {
+      console.error('❌ Failed to save progress immediately:', error);
+    }
+  }, [book.id, onProgressUpdate]);
+
+  // Track progress when page changes
+  useEffect(() => {
+    if (pages.length > 0 && !isLoading) {
+      console.log(`📍 Page changed to ${currentPageIndex + 1}/${pages.length}`);
+      saveProgress(currentPageIndex, pages.length);
+    }
+  }, [currentPageIndex, pages.length, isLoading, saveProgress]);
+
+  // Enhanced back to library function with progress save
+  const handleBackToLibrary = useCallback(() => {
+    if (pages.length > 0) {
+      console.log('💾 Saving progress before returning to library...');
+      saveProgressImmediately(currentPageIndex, pages.length);
+    }
+    
+    // Clear any pending progress saves
+    if (saveProgressTimeoutRef.current) {
+      clearTimeout(saveProgressTimeoutRef.current);
+    }
+    
+    if (onBackToLibrary) {
+      setTimeout(() => {
+        onBackToLibrary();
+      }, 100); // Small delay to ensure progress is saved
+    }
+  }, [currentPageIndex, pages.length, saveProgressImmediately, onBackToLibrary]);
 
   // Keyboard navigation (removed click navigation)
   useEffect(() => {
@@ -645,8 +661,8 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
       } else if (event.key === 'Escape') {
         if (showSettings) {
           setShowSettings(false);
-        } else if (onBackToLibrary) {
-          onBackToLibrary();
+        } else {
+          handleBackToLibrary();
         }
       }
     };
@@ -665,7 +681,22 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('click', handleClickOutside);
     };
-  }, [goToNext, goToPrev, showSettings, onBackToLibrary]);
+  }, [goToNext, goToPrev, showSettings, handleBackToLibrary]);
+
+  // Save progress on component unmount
+  useEffect(() => {
+    return () => {
+      if (pages.length > 0 && currentPageIndex >= 0) {
+        console.log('💾 Saving progress on unmount...');
+        saveProgressImmediately(currentPageIndex, pages.length);
+      }
+      
+      // Clear any pending progress saves
+      if (saveProgressTimeoutRef.current) {
+        clearTimeout(saveProgressTimeoutRef.current);
+      }
+    };
+  }, [currentPageIndex, pages.length, saveProgressImmediately]);
 
   // Debug function to test settings
   const testSettings = () => {
@@ -724,7 +755,6 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
         ) : (
           <p>Please try refreshing the page or selecting a different book.</p>
         )}
-        // ...existing code...
         <button 
           onClick={() => {
             setError(null);
@@ -794,10 +824,22 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
               <div className="page-counter">
                 Page {currentPageIndex + 1} of {pages.length}
               </div>
-             
+              <div className="progress-indicator">
+                {Math.round(((currentPageIndex + 1) / pages.length) * 100)}% complete
+              </div>
             </div>
           )}
         </div>
+        
+        <button 
+          onClick={handleBackToLibrary}
+          className="back-to-library-button"
+          aria-label="Back to library"
+          title="Back to library"
+        >
+          <span className="nav-icon">📚</span>
+          <span className="nav-text">Library</span>
+        </button>
         
         <button 
           onClick={(e) => {
@@ -812,7 +854,6 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
           title="Customize reading experience"
         >
           <span className="nav-icon">⚙️</span>
-          <span className="nav-text">Settings</span>
         </button>
         
         <button 
@@ -829,84 +870,124 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
 
       {/* Settings panel */}
       {showSettings && (
-        <div className="settings-panel">
-          <h3>Reading Settings</h3>
-          
-          <div className="setting-group">
-            <label>Font Size</label>
-            <input 
-              type="range" 
-              min="12" 
-              max="32" 
-              value={textSettings.fontSize}
-              onChange={(e) => setTextSettings(prev => ({ ...prev, fontSize: parseInt(e.target.value) }))}
-            />
-            <span>{textSettings.fontSize}px</span>
-          </div>
-          
-          <div className="setting-group">
-            <label>Line Height</label>
-            <input 
-              type="range" 
-              min="1.2" 
-              max="2.5" 
-              step="0.1"
-              value={textSettings.lineHeight}
-              onChange={(e) => setTextSettings(prev => ({ ...prev, lineHeight: parseFloat(e.target.value) }))}
-            />
-            <span>{textSettings.lineHeight}</span>
-          </div>
-          
-          <div className="setting-group">
-            <label>Margin</label>
-            <input 
-              type="range" 
-              min="20" 
-              max="80" 
-              value={textSettings.margin}
-              onChange={(e) => setTextSettings(prev => ({ ...prev, margin: parseInt(e.target.value) }))}
-            />
-            <span>{textSettings.margin}px</span>
-          </div>
-          
-          <div className="setting-group">
-            <label>Font Family</label>
-            <select 
-              value={textSettings.fontFamily}
-              onChange={(e) => setTextSettings(prev => ({ ...prev, fontFamily: e.target.value }))}
-            >
-              <option value="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">System Default</option>
-              <option value="Georgia, serif">Georgia</option>
-              <option value="'Times New Roman', serif">Times New Roman</option>
-              <option value="Arial, sans-serif">Arial</option>
-              <option value="'Courier New', monospace">Courier New</option>
-            </select>
-          </div>
-          
-          <div className="setting-group">
-            <label>Theme</label>
-            <div className="theme-buttons">
-              <button 
-                className={textSettings.theme === 'light' ? 'active' : ''}
-                onClick={() => setTextSettings(prev => ({ ...prev, theme: 'light' }))}
+        <>
+          <div 
+            className="settings-overlay"
+            onClick={() => setShowSettings(false)}
+          />
+          <div className="settings-panel">
+            <div className="settings-header">
+              <h3>Reading Settings</h3>
+              <button
+                className="close-settings-button"
+                onClick={() => setShowSettings(false)}
+                aria-label="Close settings"
               >
-                Light
-              </button>
-              <button 
-                className={textSettings.theme === 'dark' ? 'active' : ''}
-                onClick={() => setTextSettings(prev => ({ ...prev, theme: 'dark' }))}
-              >
-                Dark
-              </button>
-              <button 
-                className={textSettings.theme === 'sepia' ? 'active' : ''}
-                onClick={() => setTextSettings(prev => ({ ...prev, theme: 'sepia' }))}
-              >
-                Sepia
+                ✕
               </button>
             </div>
+            
+            <div className="settings-content">
+              <div className="setting-group">
+                <label>Font Size</label>
+                <div className="setting-control">
+                  <input 
+                    type="range" 
+                    min="12" 
+                    max="32" 
+                    value={textSettings.fontSize}
+                    onChange={(e) => setTextSettings(prev => ({ ...prev, fontSize: parseInt(e.target.value) }))}
+                  />
+                  <span className="setting-value">{textSettings.fontSize}px</span>
+                </div>
+              </div>
+              
+              <div className="setting-group">
+                <label>Line Height</label>
+                <div className="setting-control">
+                  <input 
+                    type="range" 
+                    min="1.2" 
+                    max="2.5" 
+                    step="0.1"
+                    value={textSettings.lineHeight}
+                    onChange={(e) => setTextSettings(prev => ({ ...prev, lineHeight: parseFloat(e.target.value) }))}
+                  />
+                  <span className="setting-value">{textSettings.lineHeight}</span>
+                </div>
+              </div>
+              
+              <div className="setting-group">
+                <label>Margin</label>
+                <div className="setting-control">
+                  <input 
+                    type="range" 
+                    min="20" 
+                    max="80" 
+                    value={textSettings.margin}
+                    onChange={(e) => setTextSettings(prev => ({ ...prev, margin: parseInt(e.target.value) }))}
+                  />
+                  <span className="setting-value">{textSettings.margin}px</span>
+                </div>
+              </div>
+              
+              <div className="setting-group">
+                <label>Font Family</label>
+                <select 
+                  value={textSettings.fontFamily}
+                  onChange={(e) => setTextSettings(prev => ({ ...prev, fontFamily: e.target.value }))}
+                >
+                  <option value="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">System Default</option>
+                  <option value="Georgia, serif">Georgia</option>
+                  <option value="'Times New Roman', serif">Times New Roman</option>
+                  <option value="Arial, sans-serif">Arial</option>
+                  <option value="'Courier New', monospace">Courier New</option>
+                </select>
+              </div>
+              
+              <div className="setting-group">
+                <label>Theme</label>
+                <div className="theme-buttons">
+                  <button 
+                    className={textSettings.theme === 'light' ? 'active' : ''}
+                    onClick={() => setTextSettings(prev => ({ ...prev, theme: 'light' }))}
+                  >
+                    Light
+                  </button>
+                  <button 
+                    className={textSettings.theme === 'dark' ? 'active' : ''}
+                    onClick={() => setTextSettings(prev => ({ ...prev, theme: 'dark' }))}
+                  >
+                    Dark
+                  </button>
+                  <button 
+                    className={textSettings.theme === 'sepia' ? 'active' : ''}
+                    onClick={() => setTextSettings(prev => ({ ...prev, theme: 'sepia' }))}
+                  >
+                    Sepia
+                  </button>
+                </div>
+              </div>
+
+              <div className="setting-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={doublePageView}
+                    onChange={(e) => {
+                      setDoublePageView(e.target.checked);
+                      // Reset to even page for double page view
+                      if (e.target.checked && currentPageIndex % 2 !== 0) {
+                        setCurrentPageIndex(prev => Math.max(0, prev - 1));
+                      }
+                    }}
+                  />
+                  <span>Double Page View</span>
+                </label>
+              </div>
+            </div>
           </div>
-        </div>
+        </>
       )}
       
       {migakuDetected && (
