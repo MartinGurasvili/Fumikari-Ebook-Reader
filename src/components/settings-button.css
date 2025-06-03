@@ -1,0 +1,339 @@
+/* Settings Button Styles - Shared across components */
+
+/* Common settings button style */
+.settings-button {
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  width: 3rem;
+  height: 3rem;
+  cursor: pointer;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.settings-button:hover {
+  background: var(--bg-secondary);
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px var(--shadow-hover);
+}
+
+/* Settings button in reader view (floating action button) */
+.reader-view .settings-button {
+  position: fixed;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  right: 1rem;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px var(--shadow-hover);
+  z-index: 999;
+}
+
+.reader-view .settings-button:hover {
+  transform: scale(1.05);
+  background: var(--accent-hover);
+}
+
+.reader-view .settings-button:active {
+  transform: scale(0.9);
+}
+
+/* Settings panel styles */
+.settings-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 998;
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+.settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 400px;
+  max-width: 90vw;
+  height: 100vh;
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border-color);
+  box-shadow: -4px 0 24px var(--shadow);
+  z-index: 999;
+  transform: translateX(100%);
+  animation: slideInFromRight 0.3s ease-out forwards;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@keyframes slideInFromRight {
+  to {
+    transform: translateX(0);
+  }
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.settings-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.close-settings-button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+}
+
+.close-settings-button:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+
+.settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+/* DirectEpubReader specific settings styles */
+.direct-epub-reader .settings-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 400px;
+  height: auto;
+  max-height: 90vh;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  animation: none;
+}
+
+.direct-epub-reader .setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.direct-epub-reader .setting-group label {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.direct-epub-reader .setting-group input[type="range"] {
+  width: 100%;
+}
+
+.direct-epub-reader .setting-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.direct-epub-reader .setting-value {
+  min-width: 3rem;
+  text-align: right;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.direct-epub-reader .theme-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.direct-epub-reader .theme-buttons button {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+}
+
+.direct-epub-reader .theme-buttons button:hover {
+  background: var(--bg-secondary);
+}
+
+.direct-epub-reader .theme-buttons button.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.direct-epub-reader .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.direct-epub-reader .checkbox-label input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--accent);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .settings-panel {
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .settings-button, 
+  .library-header .settings-button {
+    width: 3.5rem;
+    height: 3.5rem;
+    font-size: 1.3rem;
+    box-shadow: 0 3px 8px var(--shadow-hover);
+    border-width: 2px;
+  }
+  
+  .settings-button:active,
+  .library-header .settings-button:active {
+    transform: scale(0.95);
+  }
+  
+  .reader-view .settings-button {
+    position: fixed;
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px var(--shadow-hover);
+    border: none;
+    background: var(--accent);
+    color: white;
+    z-index: 999;
+    touch-action: manipulation;
+    transition: all 0.2s ease;
+  }
+  
+  .reader-view .settings-button:active {
+    transform: scale(0.9);
+  }
+  
+  .reader-view .settings-button {
+    right: 1rem;
+  }
+  
+  .reader-view .settings-button .nav-icon {
+    font-size: 20px;
+  }
+  
+  .reader-view .settings-button .nav-text {
+    display: none;
+  }
+  
+  .direct-epub-reader .settings-panel {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    border-radius: 0;
+    transform: none;
+  }
+}
+
+/* Small mobile screens */
+@media (max-width: 480px) {
+  .library-header .settings-button {
+    width: 3rem;
+    height: 3rem;
+    font-size: 1.1rem;
+  }
+  
+  .reader-view .settings-button {
+    width: 44px;
+    height: 44px;
+    bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+  
+  .reader-view .settings-button .nav-icon {
+    font-size: 18px;
+  }
+}
+
+/* Landscape orientation */
+@media (max-width: 768px) and (orientation: landscape) {
+  .reader-view .settings-button {
+    width: 40px;
+    height: 40px;
+    bottom: calc(60px + env(safe-area-inset-bottom));
+  }
+  
+  .reader-view .settings-button .nav-icon {
+    font-size: 16px;
+  }
+}
+
+/* Touch device improvements */
+@media (pointer: coarse) {
+  .settings-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  .library-header .settings-button:active {
+    transform: scale(0.95);
+    background: var(--bg-secondary);
+  }
+  
+  .library-header .settings-button:hover {
+    transform: none;
+    box-shadow: 0 2px 4px var(--shadow);
+  }
+}

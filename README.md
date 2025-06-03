@@ -1,92 +1,129 @@
-# Fumikari E-Reader - Online Ebook Reader
+<p align="center">
+  <img src="fumikari.png" alt="Fumikari Logo" width="180" height="180" />
+</p>
 
-A modern e-reader web application built with React, TypeScript, and Vite. Specially designed for language learning with support for Migaku, Yomichan, and other browser extensions. Supports both PDF and EPUB files.
+# Fumikari E-Reader
 
-## ✨ Key Features
+A modern, accessible e-reader web app for Google Drive. Fumikari lets you read EPUB and PDF books stored in your Google Drive, with features designed for language learners and a focus on accessibility and customization.
 
-- **Drag and drop support** for PDFs and EPUBs
-- **Automatic cover art fetching** from the internet
-- **Accessibility features** and reading customization
-- **Reading progress tracking** with progress bars
-- **Migaku & Yomichan browser extension compatibility** for language learning
-- **Iframe-free EPUB rendering** for better extension access
-- **Sliding settings panel** with book management features
-- **Hidden books functionality** for library organization
+---
 
-## 🔧 Migaku Extension Compatibility
+## 🚀 How It Works
 
-This e-reader specifically addresses the issue where browser extensions (like Migaku for language learning) cannot access text content rendered in iframes. The app uses two different rendering approaches:
+1. **Create a `books` folder in your Google Drive** (all lowercase).
+2. **Add your EPUB and PDF files** to this folder.
+3. **Connect Fumikari to your Google Drive** (via the app UI).
+4. **Browse and read your books** directly in your browser.
 
-### For EPUB Files: DirectEpubReader
-- **Direct DOM rendering**: Parses EPUB files manually using JSZip and renders content directly in the DOM
-- **No iframes**: Text is fully accessible to browser extensions
-- **Extension detection**: Automatically detects Migaku extension and optimizes rendering
-- **Language detection**: Automatically detects content language for better extension integration
-- **Chapter navigation**: Click-based and keyboard navigation support
+Fumikari will automatically detect and display all supported books in your Drive's `books` folder.
 
-### For PDF Files: Traditional Reader
-- Uses pdf.js for PDF rendering (iframe-based)
-- Note: PDF text accessibility for extensions may be limited due to PDF.js architecture
+---
 
-## 🚀 Getting Started
+## ✨ Features
+
+- **Google Drive integration**: Your library is always in sync with your Drive.
+- **Drag and drop support** for PDFs and EPUBs (from Drive).
+- **Automatic cover art fetching** from the internet.
+- **Reading progress tracking** with progress bars.
+- **Migaku & Yomichan browser extension compatibility** for language learning.
+- **Iframe-free EPUB rendering** for full extension access.
+- **Customizable reading experience** (compact view, double-page, etc).
+- **Hidden books**: Organize your library by hiding books.
+- **Accessible UI**: Keyboard navigation, ARIA labels, and responsive design.
+
+---
+
+## 🗂️ Google Drive Setup
+
+- **Required:** You must have a folder named `books` in the root of your Google Drive.
+- Add your EPUB and PDF files to this folder.
+- The app will only show books from this folder.
+
+---
+
+## 🛠️ Getting Started
 
 ### Prerequisites
-- Node.js (v16 or higher)
+
+- Node.js (v16+)
 - npm or yarn
+- A Google account
 
 ### Installation
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
+```bash
+git clone https://github.com/yourusername/fumikari.git
+cd fumikari
+npm install
+npm run dev
+```
 
-## 📁 Project Structure
+### First Use
+
+1. Open the app in your browser.
+2. Click "Connect to Google Drive" and authorize access.
+3. If you haven't already, create a `books` folder in your Google Drive and add books.
+4. Your library will appear automatically.
+
+---
+
+## 📚 Project Structure
 
 ```
 src/
 ├── components/
 │   ├── DirectEpubReader.tsx    # Iframe-free EPUB reader
-│   ├── Reader.tsx              # Traditional iframe-based reader  
-│   ├── FileDrop.tsx           # File upload component
-│   └── ProgressBar.tsx        # Reading progress display
-└── App.tsx                    # Main application component
+│   ├── Reader.tsx              # PDF reader
+│   ├── FileDrop.tsx            # File upload (future)
+│   └── ProgressBar.tsx         # Reading progress
+├── services/                   # Google Drive, cover art, etc.
+└── App.tsx                     # Main app logic
 ```
+
+---
 
 ## 🔧 Technical Details
 
-### EPUB Rendering Approach
-The `DirectEpubReader` component:
-1. Downloads EPUB file
-2. Extracts and parses using JSZip
-3. Reads OPF manifest and spine for chapter order
-4. Renders HTML content directly in DOM elements
-5. Adds Migaku-specific attributes and events
-6. Supports language detection and chapter navigation
+- **Google Drive API**: Used for authentication and file access.
+- **Direct EPUB rendering**: EPUBs are parsed and rendered directly in the DOM (no iframes).
+- **PDF.js**: Used for PDF rendering.
+- **Cover Art**: Fumikari fetches cover images for your books automatically.
+- **Progress Sync**: Reading progress is saved locally for each book.
 
-### Dependencies
-- `epubjs`: Traditional EPUB rendering (used for fallback)
-- `jszip`: Direct EPUB file parsing and extraction
-- `pdfjs-dist`: PDF file rendering
-- `react-dropzone`: File upload functionality
+---
 
-## 🌐 Browser Extension Support
+## 🌐 Extension Support
 
-This app is specifically designed to work with language learning browser extensions like Migaku:
-- Text content is rendered directly in the DOM (no iframes for EPUB)
-- Proper language attributes are set on content elements
-- Extension detection and optimization
-- Custom events dispatched for extension integration
+- **Migaku, Yomichan, etc.**: EPUB content is rendered directly in the DOM for full compatibility with language-learning browser extensions.
 
-## 🎨 Accessibility & Customization
+---
 
-- Keyboard navigation support (arrow keys, page up/down)
-- Click-based navigation (left/right side of screen)
-- Responsive design for mobile and desktop
-- Reading progress tracking and persistence
-- Focus on accessibility and modern React/TypeScript best practices
+## ♿ Accessibility & Customization
+
+- Keyboard navigation and ARIA labels throughout.
+- Responsive design for desktop and mobile.
+- Reading settings: compact view, double-page, and more.
+
+---
+
+## ❓ FAQ
+
+**Q: Why can't I see my books?**  
+A: Make sure you have a folder named `books` (all lowercase) in your Google Drive and that your EPUB/PDF files are inside it.
+
+**Q: Is my data private?**  
+A: Yes. Fumikari only accesses your Google Drive files with your permission and never stores your data externally.
+
+---
+
+## 📝 License
+
+MIT
+
+---
+
+<p align="center">
+  <img src="fumikari.png" alt="Fumikari Logo" width="120" height="120" />
+  <br />
+  <b>Fumikari</b> — Read anywhere, from your Google Drive.
+</p>

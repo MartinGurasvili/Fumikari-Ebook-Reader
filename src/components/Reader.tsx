@@ -104,6 +104,7 @@ export const Reader: React.FC<ReaderProps> = ({
   const [canGoPrev, setCanGoPrev] = useState(false);
   const [migakuDetected, setMigakuDetected] = useState(false);
   const [currentProgress, setCurrentProgress] = useState(book.progress);
+  const [currentPage, setCurrentPage] = useState(book.currentPage || 1);
 
   // Debounced progress saving to avoid too frequent updates
   const saveProgressTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -112,6 +113,7 @@ export const Reader: React.FC<ReaderProps> = ({
   const saveProgress = useCallback((cfi: string, progress: number, page: number) => {
     // Update local state immediately
     setCurrentProgress(progress);
+    setCurrentPage(page);
     
     // Skip if progress hasn't changed significantly
     const lastSaved = lastSavedProgressRef.current;
@@ -144,6 +146,7 @@ export const Reader: React.FC<ReaderProps> = ({
   const saveProgressImmediately = useCallback((cfi: string, progress: number, page: number) => {
     try {
       setCurrentProgress(progress);
+      setCurrentPage(page);
       if (onProgressUpdate) {
         onProgressUpdate(book.id, progress, cfi, page);
         lastSavedProgressRef.current = { progress, cfi, page };
@@ -665,33 +668,61 @@ export const Reader: React.FC<ReaderProps> = ({
           tabIndex={0}
         />
         
-        <div className="reader-controls">
-          <button
-            onClick={goToPrev}
+        {/* Page navigation */}
+        <div className="page-navigation">
+          <button 
+            onClick={goToPrev} 
             disabled={!canGoPrev}
-            className="nav-button prev-button"
+            className="page-nav-button prev-button"
             aria-label="Previous page"
+            title="Previous page"
           >
-            ← Previous
+            <span className="nav-icon">←</span>
+            <span className="nav-text">Previous</span>
           </button>
           
-          <div className="progress-bar">
-            <div 
-              className="progress-fill"
-              style={{ width: `${currentProgress * 100}%` }}
-              aria-hidden="true"
-            />
+          <div className="page-info">
+            <div className="page-details">
+              <div className="page-counter">
+                {currentPage > 0 ? `Page ${currentPage}` : 'Loading...'}
+              </div>
+              <div className="progress-indicator">
+                {Math.round(currentProgress * 100)}% complete
+              </div>
+            </div>
           </div>
           
-          <button
-            onClick={goToNext}
+          <button 
+            onClick={goToNext} 
             disabled={!canGoNext}
-            className="nav-button next-button"
+            className="page-nav-button next-button"
             aria-label="Next page"
+            title="Next page"
           >
-            Next →
+            <span className="nav-text">Next</span>
+            <span className="nav-icon">→</span>
           </button>
         </div>
+        
+        {/* Floating action buttons */}
+        <button 
+          onClick={onBackToLibrary}
+          className="back-to-library-button"
+          aria-label="Back to library"
+          title="Back to library"
+        >
+          <span className="nav-icon">📚</span>
+          <span className="nav-text">Library</span>
+        </button>
+        
+        <button 
+          onClick={() => {/* Add settings functionality if needed */}}
+          className="settings-button"
+          aria-label="Reading settings"
+          title="Customize reading experience"
+        >
+          <span className="nav-icon">⚙️</span>
+        </button>
       </div>
     </div>
   );

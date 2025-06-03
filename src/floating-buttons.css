@@ -1,0 +1,50 @@
+/* Back to library and settings buttons - desktop styles that match mobile */
+.reader-view .settings-button,
+.back-to-library-button {
+  position: fixed;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  padding: 0;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px var(--shadow-hover);
+  border: none;
+  z-index: 999;
+  touch-action: manipulation;
+  transition: all 0.2s ease;
+}
+
+.reader-view .settings-button:hover,
+.back-to-library-button:hover {
+  transform: scale(1.05);
+}
+
+.reader-view .settings-button:active,
+.back-to-library-button:active {
+  transform: scale(0.9);
+}
+
+.reader-view .settings-button {
+  right: 1rem;
+  background: var(--accent);
+  color: white;
+}
+
+.back-to-library-button {
+  left: 1rem;
+  background: var(--text-secondary);
+  color: white;
+}
+
+.reader-view .settings-button .nav-icon,
+.back-to-library-button .nav-icon {
+  font-size: 20px;
+}
+
+.back-to-library-button .nav-text {
+  display: none;
+}

@@ -668,7 +668,7 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
     };
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (showSettings && !(event.target as Element).closest('.settings-panel') && !(event.target as Element).closest('.settings-button')) {
+      if (showSettings && !(event.target as Element).closest('.settings-panel') && !(event.target as Element).closest('.settings-button1')) {
         console.log('🖱️ Clicking outside settings panel, closing...');
         setShowSettings(false);
       }
@@ -832,31 +832,6 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
         </div>
         
         <button 
-          onClick={handleBackToLibrary}
-          className="back-to-library-button"
-          aria-label="Back to library"
-          title="Back to library"
-        >
-          <span className="nav-icon">📚</span>
-          <span className="nav-text">Library</span>
-        </button>
-        
-        <button 
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Settings button clicked, current showSettings:', showSettings);
-            setShowSettings(!showSettings);
-            console.log('Setting showSettings to:', !showSettings);
-          }}
-          className="settings-button"
-          aria-label="Reading settings"
-          title="Customize reading experience"
-        >
-          <span className="nav-icon">⚙️</span>
-        </button>
-        
-        <button 
           onClick={goToNext} 
           disabled={currentPageIndex >= pages.length - 1}
           className="page-nav-button next-button"
@@ -868,6 +843,32 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
         </button>
       </div>
 
+      {/* Floating action buttons */}
+      <button 
+        onClick={handleBackToLibrary}
+        className="back-to-library-button"
+        aria-label="Back to library"
+        title="Back to library"
+      >
+        <span className="nav-icon">📚</span>
+        <span className="nav-text">Library</span>
+      </button>
+      
+      <button 
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('Settings button clicked, current showSettings:', showSettings);
+          setShowSettings(!showSettings);
+          console.log('Setting showSettings to:', !showSettings);
+        }}
+        className="settings-button"
+        aria-label="Reading settings"
+        title="Customize reading experience"
+      >
+        <span className="nav-icon">⚙️</span>
+      </button>
+
       {/* Settings panel */}
       {showSettings && (
         <>
@@ -875,7 +876,7 @@ const DirectEpubReaderComponent: React.FC<ReaderProps> = ({
             className="settings-overlay"
             onClick={() => setShowSettings(false)}
           />
-          <div className="settings-panel">
+          <div className="settings-panel ">
             <div className="settings-header">
               <h3>Reading Settings</h3>
               <button

@@ -6,6 +6,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { googleDriveService } from './services/googleDrive';
 import { CoverArtService } from './services/coverArt';
 import './App.css';
+import './floating-buttons.css';
 
 const BOOKS_KEY = 'reader-books';
 const STORAGE_PREFIX = 'reader-';
@@ -25,6 +26,7 @@ export interface Book {
   currentPage: number;
   currentCfi?: string;
   type: 'epub' | 'pdf';
+  lastRead?: number; // Timestamp of when the book was last read
 }
 
 function App() {
@@ -50,16 +52,33 @@ function App() {
     [library, currentBookId]
   );
 
-  // Separate visible and hidden books
-  const visibleBooks = useMemo(() => 
-    library.filter(book => !hiddenBooks.has(book.id)),
-    [library, hiddenBooks]
-  );
+  // Separate visible and hidden books, sorted by most recently read
+  const visibleBooks = useMemo(() => {
+    const filteredBooks = library.filter(book => !hiddenBooks.has(book.id));
+    // Sort by lastRead timestamp (most recent first)
+    return filteredBooks.sort((a, b) => {
+      // If both have lastRead timestamps, compare them
+      if (a.lastRead && b.lastRead) {
+        return b.lastRead - a.lastRead;
+      }
+      // If only one has lastRead, prioritize the one with lastRead
+      if (a.lastRead) return -1;
+      if (b.lastRead) return 1;
+      // If neither has lastRead, maintain original order
+      return 0;
+    });
+  }, [library, hiddenBooks]);
 
-  const hiddenBooksArray = useMemo(() => 
-    library.filter(book => hiddenBooks.has(book.id)),
-    [library, hiddenBooks]
-  );
+  const hiddenBooksArray = useMemo(() => {
+    const filteredBooks = library.filter(book => hiddenBooks.has(book.id));
+    // Sort by lastRead timestamp (most recent first)
+    return filteredBooks.sort((a, b) => {
+      if (a.lastRead && b.lastRead) return b.lastRead - a.lastRead;
+      if (a.lastRead) return -1;
+      if (b.lastRead) return 1;
+      return 0;
+    });
+  }, [library, hiddenBooks]);
 
   // Function to fetch missing cover art for existing books
   const fetchMissingCovers = useCallback(async (books: Book[]) => {
@@ -186,7 +205,8 @@ function App() {
             progress: 0,
             currentPage: 1,
             currentCfi: undefined,
-            type: fileType
+            type: fileType,
+            lastRead: 0 // Default to 0 for new books so they appear at the end
           } satisfies Book;
           return newBook;
         });
@@ -282,7 +302,23 @@ function App() {
   }, [showSettings]);
 
   const handleBookSelect = useCallback((bookId: string) => {
+    // Update the current book ID
     setCurrentBookId(bookId);
+    
+    // Update the lastRead timestamp for the selected book
+    setLibrary(prev => {
+      const now = Date.now();
+      const updatedLibrary = prev.map(book => 
+        book.id === bookId 
+          ? { ...book, lastRead: now }
+          : book
+      );
+      
+      // Save to localStorage immediately
+      localStorage.setItem(BOOKS_KEY, JSON.stringify(updatedLibrary));
+      
+      return updatedLibrary;
+    });
   }, []);
 
   // Handle progress updates from the reader
@@ -290,9 +326,10 @@ function App() {
     console.log(`📊 Progress update received: ${bookId} - ${Math.round(progress * 100)}% (Page ${currentPage})`);
     
     setLibrary(prev => {
+      const now = Date.now();
       const updatedLibrary = prev.map(book => 
         book.id === bookId 
-          ? { ...book, progress, currentPage, currentCfi }
+          ? { ...book, progress, currentPage, currentCfi, lastRead: now }
           : book
       );
       
@@ -466,7 +503,7 @@ function App() {
       ) : (
         <div className="library-view">
           <div className="library-header">
-            <h1>Your Books</h1>
+            <h1>Fumikari 文狩</h1>
             <div className="header-controls">
               <button 
                 onClick={() => setShowSettings(!showSettings)}
